@@ -292,58 +292,58 @@
 > These components are reused across multiple views.
 
 ### 3.1 Loading Screen Component
-- [ ] Create `src/app/components/loading-screen/`
-- [ ] Display animated loading indicator with flavor text (e.g. "Gathering evidence...", "Questioning witnesses...")
-- [ ] Accept `@Input() message: string`
-- [ ] Animate text changes with fade transition
+- [x] Create `src/app/components/loading-screen/`
+- [x] Display animated loading indicator with flavor text (e.g. "Gathering evidence...", "Questioning witnesses...")
+- [x] Accept `@Input() message: string`
+- [x] Animate text changes with fade transition
 
 ### 3.2 Clue Card Component
-- [ ] Create `src/app/components/clue-card/`
-- [ ] Display clue name, description, location, and optional image
-- [ ] Show "Red Herring" badge only after reveal phase
-- [ ] Accept `@Input() clue: Clue` and `@Input() showTruth: boolean`
+- [x] Create `src/app/components/clue-card/`
+- [x] Display clue name, description, location, and optional image
+- [x] Show "Red Herring" badge only after reveal phase
+- [x] Accept `@Input() clue: Clue` and `@Input() showTruth: boolean`
 
 ### 3.3 Suspect Card Component
-- [ ] Create `src/app/components/suspect-card/`
-- [ ] Display suspect portrait (image or placeholder), name, occupation, and brief description
-- [ ] Clicking opens the interview dialogue for that suspect
-- [ ] Accept `@Input() suspect: Suspect` and `@Input() isInterviewed: boolean`
+- [x] Create `src/app/components/suspect-card/`
+- [x] Display suspect portrait (image or placeholder), name, occupation, and brief description
+- [x] Clicking opens the interview dialogue for that suspect
+- [x] Accept `@Input() suspect: Suspect` and `@Input() isInterviewed: boolean`
 
 ### 3.4 Location Card Component
-- [ ] Create `src/app/components/location-card/`
-- [ ] Display location image or placeholder, name, and atmosphere
-- [ ] Clicking triggers the investigation event for that location
-- [ ] Accept `@Input() location: Location` and `@Input() isVisited: boolean`
+- [x] Create `src/app/components/location-card/`
+- [x] Display location image or placeholder, name, and atmosphere
+- [x] Clicking triggers the investigation event for that location
+- [x] Accept `@Input() location: Location` and `@Input() isVisited: boolean`
 
 ### 3.5 Timeline Component
-- [ ] Create `src/app/components/timeline/`
-- [ ] Render a vertical list of `TimelineEvent` entries
-- [ ] Show only the events the player has unlocked so far
-- [ ] Mark conflicting/false entries visually after truth is revealed
+- [x] Create `src/app/components/timeline/`
+- [x] Render a vertical list of `TimelineEvent` entries
+- [x] Show only the events the player has unlocked so far
+- [x] Mark conflicting/false entries visually after truth is revealed
 
 ### 3.6 Dialogue Box Component
-- [ ] Create `src/app/components/dialogue-box/`
-- [ ] Display suspect name and dialogue lines in sequence (click-to-advance)
-- [ ] Style as a speech bubble or bordered panel matching the session theme
-- [ ] Accept `@Input() lines: DialogueLine[]` and `@Output() dialogueClosed: EventEmitter<void>`
+- [x] Create `src/app/components/dialogue-box/`
+- [x] Display suspect name and dialogue lines in sequence (click-to-advance)
+- [x] Style as a speech bubble or bordered panel matching the session theme
+- [x] Accept `@Input() lines: DialogueLine[]` and `@Output() dialogueClosed: EventEmitter<void>`
 
 ### 3.7 Puzzle Frame Component
-- [ ] Create `src/app/components/puzzle-frame/`
-- [ ] Render puzzle `htmlComponent` inside a sandboxed `<iframe sandbox="allow-scripts">`
-- [ ] Listen for `window.postMessage` from the iframe to detect puzzle completion
-- [ ] On completion: emit `puzzleSolved` event and display reward clue
-- [ ] Accept `@Input() puzzle: PuzzleEvent` and `@Output() puzzleSolved: EventEmitter<string>` (clue ID)
+- [x] Create `src/app/components/puzzle-frame/`
+- [x] Render puzzle `htmlComponent` inside a sandboxed `<iframe sandbox="allow-scripts">`
+- [x] Listen for `window.postMessage` from the iframe to detect puzzle completion
+- [x] On completion: emit `puzzleSolved` event and display reward clue
+- [x] Accept `@Input() puzzle: PuzzleEvent` and `@Output() puzzleSolved: EventEmitter<string>` (clue ID)
 
 ### 3.8 Notification / Toast Component
-- [ ] Create `src/app/components/toast/`
-- [ ] Display short notifications: "New clue discovered!", "Suspect unlocked!", "New area available"
-- [ ] Auto-dismiss after 3 seconds
-- [ ] Stack multiple toasts gracefully
+- [x] Create `src/app/components/toast/`
+- [x] Display short notifications: "New clue discovered!", "Suspect unlocked!", "New area available"
+- [x] Auto-dismiss after 3 seconds
+- [x] Stack multiple toasts gracefully
 
 ### 3.9 Act Banner Component
-- [ ] Create `src/app/components/act-banner/`
-- [ ] Display a full-screen animated banner when the player advances to a new act
-- [ ] Show act title and brief description from `CaseMetadata`
+- [x] Create `src/app/components/act-banner/`
+- [x] Display a full-screen animated banner when the player advances to a new act
+- [x] Show act title and brief description from `CaseMetadata`
 
 ---
 
@@ -624,4 +624,4 @@
 
 ---
 
-*Last updated: Phase 2 — Complete ✓ (Phase 3 next)*
+*Last updated: Phase 3 — Complete ✓ (Phase 4 next)*
