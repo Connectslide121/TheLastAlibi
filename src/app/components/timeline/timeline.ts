@@ -41,7 +41,10 @@ import { TimelineEvent } from '../../models';
           </div>
 
           @if (revealTruth() && !event.isTrue) {
-            <p class="text-red-400 text-xs italic mt-1 pl-15">False — part of the deception</p>
+            <p class="text-red-400 text-xs italic mt-1 pl-15 flex items-center gap-1">
+              <span class="material-icons mi-sm">gpp_bad</span>
+              False — part of the deception
+            </p>
           }
         </li>
       }

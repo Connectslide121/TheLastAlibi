@@ -11,20 +11,20 @@ import { DialogueLine } from '../../models';
       (click)="advance()"
     >
       <div
-        class="w-full max-w-2xl rounded border bg-(--color-surface) shadow-2xl p-6 flex flex-col gap-4"
+        class="dialogue-enter w-full max-w-2xl rounded border bg-(--color-surface) shadow-2xl p-6 flex flex-col gap-4"
         style="border-color: rgba(201,168,76,0.4);"
         (click)="$event.stopPropagation()"
       >
         <!-- Speaker name -->
         <div class="flex items-center gap-2">
-          <span class="w-2 h-2 rounded-full shrink-0 bg-(--color-accent)"></span>
+          <span class="material-icons mi-md text-(--color-accent)">record_voice_over</span>
           <h4 class="text-(--color-accent) font-serif font-bold text-base">
             {{ currentLine().speakerName }}
           </h4>
         </div>
 
         <!-- Dialogue text -->
-        <p class="text-(--color-text) text-base leading-relaxed min-h-16">
+        <p class="dialogue-text-reveal text-(--color-text) text-base leading-relaxed min-h-16">
           {{ currentLine().text }}
         </p>
 
@@ -38,12 +38,16 @@ import { DialogueLine } from '../../models';
             <button
               type="button"
               (click)="dialogueClosed.emit()"
-              class="text-(--color-accent) hover:underline opacity-100 text-xs cursor-pointer"
+              class="text-(--color-accent) hover:underline opacity-100 text-xs cursor-pointer flex items-center gap-1"
             >
-              Close ✕
+              <span class="material-icons mi-sm">close</span>
+              Close
             </button>
           } @else {
-            <span class="text-(--color-text) animate-pulse">Click to continue →</span>
+            <span class="text-(--color-text) animate-pulse flex items-center gap-1">
+              <span class="material-icons mi-sm">arrow_forward</span>
+              Click to continue
+            </span>
           }
         </div>
       </div>

@@ -1,9 +1,8 @@
-import { Component, OnInit, signal, computed, inject, HostListener } from '@angular/core';
+import { Component, OnInit, signal, computed, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { CaseStoreService } from '../../services/case-store.service';
 import { GameStateService } from '../../services/game-state.service';
-import { ToastService } from '../../components';
 import { CasePackage, Suspect, Clue, EvidenceBoardNote } from '../../models';
 
 interface BoardCard {
@@ -12,10 +11,23 @@ interface BoardCard {
   label: string;
   sublabel: string;
   imageUrl?: string;
+  hasContradiction: boolean;
   x: number;
   y: number;
-  connectedToIds: string[];
 }
+
+interface ConnectionLine {
+  key: string;
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  mx: number;
+  my: number; // midpoint for removal click target
+}
+
+const CARD_W = 140;
+const CARD_H = 130; // approx card height for midpoint calc
 
 @Component({
   selector: 'app-evidence-board-view',
@@ -34,108 +46,190 @@ interface BoardCard {
             class="font-mono text-xs px-3 py-1 rounded text-amber-400"
             style="border: 1px solid rgba(251,191,36,0.5); background: rgba(251,191,36,0.1);"
           >
-            Select a second card to connect
+            Click a second card to connect
           </span>
           <button
             type="button"
             (click)="cancelConnect()"
-            class="px-3 py-1.5 text-xs font-mono uppercase tracking-widest rounded border cursor-pointer border-(--color-text-muted) text-(--color-text-muted) hover:opacity-80 transition-opacity"
+            class="px-3 py-1.5 text-xs font-mono uppercase tracking-widest rounded border cursor-pointer border-(--color-text-muted) text-(--color-text-muted) hover:opacity-80 transition-opacity flex items-center gap-1"
           >
+            <span class="material-icons mi-sm">cancel</span>
             Cancel
           </button>
         } @else {
           <button
             type="button"
-            (click)="addNote()"
-            class="px-3 py-1.5 text-xs font-mono uppercase tracking-widest rounded border cursor-pointer border-(--color-accent) text-(--color-accent) hover:opacity-80 transition-opacity"
+            (click)="enterConnectMode()"
+            class="px-3 py-1.5 text-xs font-mono uppercase tracking-widest rounded border cursor-pointer border-(--color-accent) text-(--color-accent) hover:opacity-80 transition-opacity flex items-center gap-1"
           >
-            + Add Note
+            <span class="material-icons mi-sm">link</span>
+            Connect
           </button>
         }
+        <span class="text-xs text-(--color-text-muted) font-mono hidden sm:flex items-center gap-1">
+          <span class="material-icons mi-sm">note_add</span>
+          Double-click board to add note
+        </span>
         <button
           type="button"
           (click)="goBack()"
-          class="px-3 py-1.5 text-xs font-mono uppercase tracking-widest rounded border cursor-pointer border-(--color-text-muted) text-(--color-text-muted) hover:opacity-80 transition-opacity"
+          class="px-3 py-1.5 text-xs font-mono uppercase tracking-widest rounded border cursor-pointer border-(--color-text-muted) text-(--color-text-muted) hover:opacity-80 transition-opacity flex items-center gap-1"
         >
-          ← Investigation
+          <span class="material-icons mi-sm">arrow_back</span>
+          Investigation
         </button>
       </header>
 
       <!-- Board Canvas -->
       <div
-        class="relative flex-1 overflow-hidden cursor-default select-none"
-        style="background: #5c3d1e; background-image: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.05) 2px, rgba(0,0,0,0.05) 4px), repeating-linear-gradient(90deg, transparent, transparent 2px, rgba(0,0,0,0.05) 2px, rgba(0,0,0,0.05) 4px); min-height: calc(100vh - 3.5rem);"
+        #board
+        class="relative flex-1 select-none overflow-hidden"
+        style="background: #4a2f16;
+                  background-image: repeating-linear-gradient(0deg, transparent, transparent 40px, rgba(0,0,0,0.06) 40px, rgba(0,0,0,0.06) 41px),
+                                    repeating-linear-gradient(90deg, transparent, transparent 40px, rgba(0,0,0,0.06) 40px, rgba(0,0,0,0.06) 41px);
+                  min-height: calc(100vh - 3.5rem);"
         (pointermove)="onPointerMove($event)"
-        (pointerup)="onPointerUp()"
-        (pointerleave)="onPointerUp()"
+        (pointerup)="onPointerUp($event)"
+        (pointerleave)="onPointerUp($event)"
+        (dblclick)="onBoardDblClick($event)"
       >
         <!-- SVG Connection Lines -->
-        <svg class="absolute inset-0 w-full h-full pointer-events-none" style="z-index: 1;">
+        <svg class="absolute inset-0 w-full h-full" style="z-index: 1; pointer-events: none;">
+          <defs>
+            <filter id="line-glow">
+              <feGaussianBlur stdDeviation="2" result="blur" />
+              <feMerge>
+                <feMergeNode in="blur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+          </defs>
           @for (line of connectionLines(); track line.key) {
             <line
               [attr.x1]="line.x1"
               [attr.y1]="line.y1"
               [attr.x2]="line.x2"
               [attr.y2]="line.y2"
-              stroke="rgba(201,168,76,0.6)"
+              stroke="rgba(201,168,76,0.55)"
               stroke-width="2"
-              stroke-dasharray="6 4"
+              stroke-dasharray="8 5"
+              filter="url(#line-glow)"
             />
+            <!-- Invisible wider hit area for removal -->
+            <line
+              [attr.x1]="line.x1"
+              [attr.y1]="line.y1"
+              [attr.x2]="line.x2"
+              [attr.y2]="line.y2"
+              stroke="transparent"
+              stroke-width="18"
+              class="cursor-pointer"
+              style="pointer-events: stroke;"
+              (click)="removeConnection(line.key)"
+            />
+            <!-- Midpoint remove button -->
+            <g
+              class="cursor-pointer"
+              style="pointer-events: all;"
+              (click)="removeConnection(line.key)"
+            >
+              <circle
+                [attr.cx]="line.mx"
+                [attr.cy]="line.my"
+                r="8"
+                fill="#5c3d1e"
+                stroke="rgba(201,168,76,0.5)"
+                stroke-width="1"
+              />
+              <text
+                [attr.x]="line.mx"
+                [attr.y]="line.my + 4"
+                text-anchor="middle"
+                fill="rgba(201,168,76,0.8)"
+                font-size="10"
+              >
+                ×
+              </text>
+            </g>
           }
         </svg>
 
         <!-- Board Cards -->
         @for (card of boardCards(); track card.id) {
           <div
-            class="absolute rounded-lg p-3 cursor-pointer transition-transform"
+            class="absolute rounded-lg cursor-pointer transition-transform"
             [style.left.px]="card.x"
             [style.top.px]="card.y"
             [style.z-index]="dragId() === card.id ? 100 : 2"
-            [style.transform]="dragId() === card.id ? 'scale(1.04)' : 'scale(1)'"
-            [style.box-shadow]="
-              firstConnectId() === card.id
-                ? '0 0 0 3px rgba(201,168,76,0.8)'
-                : '0 4px 12px rgba(0,0,0,0.5)'
+            [style.transform]="dragId() === card.id ? 'scale(1.05)' : 'scale(1)'"
+            [style.outline]="
+              connectMode() && firstConnectId() === card.id
+                ? '2px solid var(--color-accent)'
+                : 'none'
             "
-            style="width: 140px; background: var(--color-secondary); border: 1px solid rgba(201,168,76,0.35);"
-            (pointerdown)="onPointerDown($event, card)"
+            style="width: 140px; background: var(--color-secondary);
+                      border: 1px solid rgba(201,168,76,0.3);
+                      box-shadow: 0 4px 14px rgba(0,0,0,0.6);"
+            (pointerdown)="onCardPointerDown($event, card)"
             (click)="onCardClick(card)"
           >
             <!-- Pin -->
             <div
-              class="absolute -top-2 left-1/2 -translate-x-1/2 w-4 h-4 rounded-full"
+              class="absolute -top-2.5 left-1/2 -translate-x-1/2 w-5 h-5 rounded-full flex items-center justify-center text-white text-xs shadow-md"
               [style.background]="card.type === 'suspect' ? '#b91c1c' : '#1d4ed8'"
-            ></div>
+            >
+              {{ card.type === 'suspect' ? '●' : '◆' }}
+            </div>
+            <!-- Contradiction marker -->
+            @if (card.hasContradiction) {
+              <div
+                class="absolute -top-2 -right-2 w-5 h-5 rounded-full flex items-center justify-center text-white shadow-md bg-red-600"
+                title="Contradiction found"
+              >
+                <span class="material-icons" style="font-size: 12px; line-height: 1;">priority_high</span>
+              </div>
+            }
             @if (card.imageUrl) {
               <img
                 [src]="card.imageUrl"
-                alt=""
-                class="w-full h-20 object-cover rounded mb-1.5 pointer-events-none"
+                [alt]="card.label"
+                class="w-full h-20 object-cover rounded-t-lg pointer-events-none"
               />
+            } @else {
+              <div
+                class="w-full h-12 rounded-t-lg flex items-center justify-center opacity-30"
+                style="background: var(--color-surface);"
+              >
+                <span class="material-icons mi-xl text-(--color-text-muted)">{{ card.type === 'suspect' ? 'person' : 'search' }}</span>
+              </div>
             }
-            <p class="font-heading text-xs text-(--color-accent) leading-tight mb-0.5">
-              {{ card.label }}
-            </p>
-            <p class="text-xs text-(--color-text-muted) leading-tight">{{ card.sublabel }}</p>
-            <span class="inline-block mt-1 text-xs font-mono opacity-40">
-              {{ card.type === 'suspect' ? '🧑' : '🔍' }}
-            </span>
+            <div class="p-2">
+              <p class="font-heading text-xs text-(--color-accent) leading-tight mb-0.5 truncate">
+                {{ card.label }}
+              </p>
+              <p class="text-xs text-(--color-text-muted) leading-snug line-clamp-2">
+                {{ card.sublabel }}
+              </p>
+            </div>
           </div>
         }
 
         <!-- Sticky Notes -->
         @for (note of boardNotes(); track note.id) {
           <div
-            class="absolute rounded p-2 cursor-move"
+            class="absolute rounded cursor-move"
             [style.left.px]="note.x"
             [style.top.px]="note.y"
             [style.z-index]="dragId() === note.id ? 100 : 3"
-            style="width: 140px; min-height: 80px; background: #fef08a; box-shadow: 2px 2px 6px rgba(0,0,0,0.4);"
-            (pointerdown)="onPointerDown($event, note, true)"
+            style="width: 148px; min-height: 88px;
+                      background: linear-gradient(135deg, #fef08a 0%, #fde047 100%);
+                      box-shadow: 2px 4px 8px rgba(0,0,0,0.45), -1px -1px 0 rgba(255,255,255,0.3) inset;
+                      transform: rotate(-1deg);"
+            (pointerdown)="onNotePointerDown($event, note)"
           >
             <textarea
-              class="w-full h-full bg-transparent text-xs text-gray-800 resize-none outline-none font-mono leading-relaxed"
-              style="min-height: 64px;"
+              class="w-full bg-transparent text-xs text-gray-800 resize-none outline-none font-mono leading-relaxed p-2"
+              style="min-height: 72px;"
               [value]="note.text"
               (input)="updateNoteText(note.id, $any($event.target).value)"
               (pointerdown)="$event.stopPropagation()"
@@ -145,9 +239,9 @@ interface BoardCard {
               type="button"
               (click)="removeNote(note.id)"
               (pointerdown)="$event.stopPropagation()"
-              class="absolute top-1 right-1 w-4 h-4 flex items-center justify-center text-gray-500 hover:text-gray-800 cursor-pointer text-xs leading-none"
+              class="absolute top-1 right-1 w-4 h-4 flex items-center justify-center cursor-pointer text-gray-500 hover:text-red-700 transition-colors"
             >
-              ×
+              <span class="material-icons" style="font-size: 14px;">close</span>
             </button>
           </div>
         }
@@ -159,20 +253,22 @@ export class EvidenceBoardView implements OnInit {
   private readonly router = inject(Router);
   private readonly caseStore = inject(CaseStoreService);
   private readonly gsvc = inject(GameStateService);
-  private readonly toast = inject(ToastService);
 
   private readonly casePackage = signal<CasePackage | null>(null);
 
   readonly connectMode = signal(false);
   readonly firstConnectId = signal<string | null>(null);
   readonly dragId = signal<string | null>(null);
+
   private dragOffsetX = 0;
   private dragOffsetY = 0;
   private isDraggingNote = false;
+  /** Tracks whether the pointer has moved since pointerdown — distinguishes drag from click. */
+  private hasDragged = false;
 
-  // Local card positions (not persisted — Phase 5 will add persistence)
-  private readonly cardPositions = signal<Map<string, { x: number; y: number }>>(new Map());
-  private readonly localConnections = signal<string[]>([]); // "id1:id2" pairs
+  // -----------------------------------------------------------------------
+  // Derived state
+  // -----------------------------------------------------------------------
 
   readonly boardNotes = computed((): EvidenceBoardNote[] => {
     return this.gsvc.state()?.evidenceBoardNotes ?? [];
@@ -183,28 +279,29 @@ export class EvidenceBoardView implements OnInit {
     const state = this.gsvc.state();
     if (!pkg || !state) return [];
 
-    const positions = this.cardPositions();
-    const connections = this.localConnections();
+    const positions = state.boardCardPositions ?? {};
+    const contradictions = new Set(
+      pkg.eventGraph
+        .filter((e) => e.category === 'deduction' && state.completedEventIds.includes(e.id))
+        .flatMap((e) => e.rewardsClueIds),
+    );
 
     const suspects: BoardCard[] = state.unlockedSuspectIds
       .map((id) => pkg.suspects.find((s) => s.id === id))
       .filter((s): s is Suspect => !!s)
       .map((s, i) => {
-        const pos = positions.get(s.id) ?? { x: 50 + i * 160, y: 60 };
-        const connectedToIds = connections
-          .filter((c) => c.startsWith(`${s.id}:`) || c.endsWith(`:${s.id}`))
-          .map((c) =>
-            c.startsWith(`${s.id}:`) ? c.slice(s.id.length + 1) : c.slice(0, c.indexOf(':')),
-          );
+        const pos = positions[s.id] ?? { x: 50 + i * 160, y: 60 };
         return {
           id: s.id,
           type: 'suspect',
           label: s.name,
           sublabel: s.occupation,
           imageUrl: s.imageUrl,
+          hasContradiction: state.contradictionEventIds.some((eid) =>
+            pkg.eventGraph.find((e) => e.id === eid && e.unlocksSuspectIds?.includes(s.id)),
+          ),
           x: pos.x,
           y: pos.y,
-          connectedToIds,
         };
       });
 
@@ -212,48 +309,45 @@ export class EvidenceBoardView implements OnInit {
       .map((id) => pkg.clues.find((c) => c.id === id))
       .filter((c): c is Clue => !!c)
       .map((c, i) => {
-        const pos = positions.get(c.id) ?? { x: 50 + i * 160, y: 320 };
-        const connectedToIds = connections
-          .filter((conn) => conn.startsWith(`${c.id}:`) || conn.endsWith(`:${c.id}`))
-          .map((conn) =>
-            conn.startsWith(`${c.id}:`)
-              ? conn.slice(c.id.length + 1)
-              : conn.slice(0, conn.indexOf(':')),
-          );
+        const pos = positions[c.id] ?? { x: 50 + i * 160, y: 340 };
         return {
           id: c.id,
           type: 'clue',
           label: c.name,
-          sublabel: c.description.slice(0, 40) + '…',
+          sublabel: c.description.slice(0, 50),
           imageUrl: c.imageUrl,
+          hasContradiction: contradictions.has(c.id),
           x: pos.x,
           y: pos.y,
-          connectedToIds,
         };
       });
 
     return [...suspects, ...clues];
   });
 
-  readonly connectionLines = computed(() => {
+  readonly connectionLines = computed((): ConnectionLine[] => {
     const cards = this.boardCards();
     const cardMap = new Map(cards.map((c) => [c.id, c]));
-    return this.localConnections()
+    const connections = this.gsvc.state()?.boardConnections ?? [];
+
+    return connections
       .map((key) => {
         const [a, b] = key.split(':');
         const ca = cardMap.get(a);
         const cb = cardMap.get(b);
         if (!ca || !cb) return null;
-        return {
-          key,
-          x1: ca.x + 70,
-          y1: ca.y + 50,
-          x2: cb.x + 70,
-          y2: cb.y + 50,
-        };
+        const x1 = ca.x + CARD_W / 2;
+        const y1 = ca.y + CARD_H / 2;
+        const x2 = cb.x + CARD_W / 2;
+        const y2 = cb.y + CARD_H / 2;
+        return { key, x1, y1, x2, y2, mx: (x1 + x2) / 2, my: (y1 + y2) / 2 };
       })
-      .filter((l): l is NonNullable<typeof l> => !!l);
+      .filter((l): l is ConnectionLine => !!l);
   });
+
+  // -----------------------------------------------------------------------
+  // Lifecycle
+  // -----------------------------------------------------------------------
 
   ngOnInit(): void {
     const sessionId = this.gsvc.state()?.sessionId;
@@ -266,23 +360,104 @@ export class EvidenceBoardView implements OnInit {
     });
   }
 
-  onCardClick(card: BoardCard): void {
-    if (this.dragId()) return; // was a drag, not a click
+  // -----------------------------------------------------------------------
+  // Board interactions
+  // -----------------------------------------------------------------------
 
-    if (this.connectMode()) {
-      const first = this.firstConnectId();
-      if (!first) {
-        this.firstConnectId.set(card.id);
-      } else if (first !== card.id) {
-        const key = [first, card.id].sort().join(':');
-        const existing = this.localConnections();
-        if (!existing.includes(key)) {
-          this.localConnections.set([...existing, key]);
-        }
-        this.connectMode.set(false);
-        this.firstConnectId.set(null);
-      }
+  onBoardDblClick(event: MouseEvent): void {
+    // Only create a note when double-clicking the board background itself
+    const target = event.target as HTMLElement;
+    if (
+      target.tagName === 'DIV' &&
+      !target.closest('[style*="width: 140"]') &&
+      !target.closest('[style*="width: 148"]')
+    ) {
+      this.addNoteAt(event.offsetX, event.offsetY);
     }
+  }
+
+  onCardPointerDown(event: PointerEvent, card: BoardCard): void {
+    event.stopPropagation();
+    event.preventDefault();
+    (event.target as Element).setPointerCapture(event.pointerId);
+    this.hasDragged = false;
+    this.dragId.set(card.id);
+    this.dragOffsetX = event.clientX - card.x;
+    this.dragOffsetY = event.clientY - card.y;
+    this.isDraggingNote = false;
+  }
+
+  onNotePointerDown(event: PointerEvent, note: EvidenceBoardNote): void {
+    event.stopPropagation();
+    event.preventDefault();
+    (event.target as Element).setPointerCapture(event.pointerId);
+    this.hasDragged = false;
+    this.dragId.set(note.id);
+    this.dragOffsetX = event.clientX - note.x;
+    this.dragOffsetY = event.clientY - note.y;
+    this.isDraggingNote = true;
+  }
+
+  onPointerMove(event: PointerEvent): void {
+    const id = this.dragId();
+    if (!id) return;
+
+    const newX = Math.max(0, event.clientX - this.dragOffsetX);
+    const newY = Math.max(46, event.clientY - this.dragOffsetY); // keep below header
+
+    // Mark as dragged once moved > 4px to avoid treating micro-movements as drags
+    if (!this.hasDragged) {
+      const dx =
+        event.clientX -
+        (this.dragOffsetX +
+          (this.isDraggingNote
+            ? (this.boardNotes().find((n) => n.id === id)?.x ?? 0)
+            : (this.boardCards().find((c) => c.id === id)?.x ?? 0)));
+      const dy =
+        event.clientY -
+        (this.dragOffsetY +
+          (this.isDraggingNote
+            ? (this.boardNotes().find((n) => n.id === id)?.y ?? 0)
+            : (this.boardCards().find((c) => c.id === id)?.y ?? 0)));
+      if (Math.abs(dx) > 4 || Math.abs(dy) > 4) this.hasDragged = true;
+    }
+
+    if (this.isDraggingNote) {
+      const note = this.boardNotes().find((n) => n.id === id);
+      if (note) this.gsvc.updateEvidenceBoardNote({ ...note, x: newX, y: newY });
+    } else {
+      this.gsvc.setBoardCardPosition(id, newX, newY);
+    }
+  }
+
+  onPointerUp(event: PointerEvent): void {
+    this.dragId.set(null);
+    this.isDraggingNote = false;
+    this.hasDragged = false;
+  }
+
+  onCardClick(card: BoardCard): void {
+    if (this.hasDragged) return; // was a drag
+
+    if (!this.connectMode()) return;
+
+    const first = this.firstConnectId();
+    if (!first) {
+      this.firstConnectId.set(card.id);
+    } else if (first !== card.id) {
+      this.gsvc.addBoardConnection(first, card.id);
+      this.connectMode.set(false);
+      this.firstConnectId.set(null);
+    }
+  }
+
+  removeConnection(key: string): void {
+    this.gsvc.removeBoardConnection(key);
+  }
+
+  enterConnectMode(): void {
+    this.connectMode.set(true);
+    this.firstConnectId.set(null);
   }
 
   cancelConnect(): void {
@@ -290,12 +465,16 @@ export class EvidenceBoardView implements OnInit {
     this.firstConnectId.set(null);
   }
 
-  addNote(): void {
+  // -----------------------------------------------------------------------
+  // Notes
+  // -----------------------------------------------------------------------
+
+  addNoteAt(x: number, y: number): void {
     const note: EvidenceBoardNote = {
       id: `note-${Date.now()}`,
       text: '',
-      x: 200 + Math.random() * 200,
-      y: 200 + Math.random() * 100,
+      x,
+      y,
       connectedToIds: [],
     };
     this.gsvc.addEvidenceBoardNote(note);
@@ -303,46 +482,16 @@ export class EvidenceBoardView implements OnInit {
 
   updateNoteText(noteId: string, text: string): void {
     const note = this.boardNotes().find((n) => n.id === noteId);
-    if (note) {
-      this.gsvc.updateEvidenceBoardNote({ ...note, text });
-    }
+    if (note) this.gsvc.updateEvidenceBoardNote({ ...note, text });
   }
 
   removeNote(noteId: string): void {
     this.gsvc.removeEvidenceBoardNote(noteId);
   }
 
-  onPointerDown(event: PointerEvent, item: BoardCard | EvidenceBoardNote, isNote = false): void {
-    event.preventDefault();
-    (event.target as Element).setPointerCapture(event.pointerId);
-    this.dragId.set(item.id);
-    this.dragOffsetX = event.clientX - item.x;
-    this.dragOffsetY = event.clientY - item.y;
-    this.isDraggingNote = isNote;
-  }
-
-  onPointerMove(event: PointerEvent): void {
-    const id = this.dragId();
-    if (!id) return;
-    const newX = Math.max(0, event.clientX - this.dragOffsetX);
-    const newY = Math.max(0, event.clientY - this.dragOffsetY);
-
-    if (this.isDraggingNote) {
-      const note = this.boardNotes().find((n) => n.id === id);
-      if (note) {
-        this.gsvc.updateEvidenceBoardNote({ ...note, x: newX, y: newY });
-      }
-    } else {
-      const current = new Map(this.cardPositions());
-      current.set(id, { x: newX, y: newY });
-      this.cardPositions.set(current);
-    }
-  }
-
-  onPointerUp(): void {
-    this.dragId.set(null);
-    this.isDraggingNote = false;
-  }
+  // -----------------------------------------------------------------------
+  // Navigation
+  // -----------------------------------------------------------------------
 
   goBack(): void {
     void this.router.navigate(['/investigation']);

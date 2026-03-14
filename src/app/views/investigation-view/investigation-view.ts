@@ -18,6 +18,7 @@ import {
   Clue,
   PuzzleEvent,
   DialogueLine,
+  Hint,
 } from '../../models';
 
 @Component({
@@ -37,13 +38,22 @@ import {
         class="fixed top-0 inset-x-0 z-50 flex items-center gap-4 px-6 py-3 bg-(--color-surface)"
         style="border-bottom: var(--border-style);"
       >
+        <!-- Mobile sidebar toggle -->
+        <button
+          type="button"
+          (click)="sidebarOpen.set(!sidebarOpen())"
+          class="md:hidden p-1.5 rounded text-(--color-accent) hover:opacity-80 transition-opacity cursor-pointer"
+          aria-label="Toggle suspects panel"
+        >
+          <span class="material-icons mi-md">menu</span>
+        </button>
         <h1 class="font-heading text-lg text-(--color-accent) truncate flex-1">
           {{ casePackage()?.metadata?.title ?? 'The Last Alibi' }}
         </h1>
-        <span class="font-mono text-sm text-(--color-text-muted)">
+        <span class="hidden sm:inline font-mono text-sm text-(--color-text-muted)">
           Act {{ gameState()?.currentAct ?? 1 }} / 3
         </span>
-        <span class="font-mono text-sm text-(--color-text-muted)">
+        <span class="hidden sm:inline font-mono text-sm text-(--color-text-muted)">
           {{ gameState()?.actionsCount ?? 0 }} actions
         </span>
         <button
@@ -51,19 +61,30 @@ import {
           (click)="goToEvidenceBoard()"
           class="px-3 py-1.5 text-xs font-mono uppercase tracking-widest rounded cursor-pointer border border-(--color-accent) text-(--color-accent) hover:opacity-80 transition-opacity"
         >
-          Evidence Board
+          <span class="material-icons mi-sm">dashboard</span>
+          Board
         </button>
       </header>
+
+      <!-- Mobile sidebar backdrop -->
+      @if (sidebarOpen()) {
+        <div
+          class="md:hidden fixed inset-0 z-30 bg-black/50"
+          (click)="sidebarOpen.set(false)"
+        ></div>
+      }
 
       <!-- Main Layout -->
       <div class="pt-14 flex flex-1">
         <!-- Left Sidebar: Suspects + Progress + Hint -->
         <aside
-          class="w-64 shrink-0 flex flex-col gap-4 p-4 overflow-y-auto"
+          class="fixed md:relative z-40 top-14 md:top-auto bottom-0 md:bottom-auto w-64 shrink-0 flex flex-col gap-4 p-4 overflow-y-auto transition-transform duration-300 md:translate-x-0 bg-(--color-primary) md:bg-transparent"
+          [class.-translate-x-full]="!sidebarOpen()"
           style="border-right: var(--border-style); min-height: calc(100vh - 3.5rem);"
         >
           <!-- Act Progress -->
-          <div class="font-mono text-xs text-(--color-text-muted) uppercase tracking-widest">
+          <div class="font-mono text-xs text-(--color-text-muted) uppercase tracking-widest flex items-center gap-1.5">
+            <span class="material-icons mi-sm">timeline</span>
             Act {{ gameState()?.currentAct ?? 1 }} Progress
           </div>
           <div class="h-1.5 rounded-full overflow-hidden bg-(--color-surface)">
@@ -74,7 +95,8 @@ import {
           </div>
 
           <!-- Suspects -->
-          <div class="font-mono text-xs text-(--color-text-muted) uppercase tracking-widest mt-2">
+          <div class="font-mono text-xs text-(--color-text-muted) uppercase tracking-widest mt-2 flex items-center gap-1.5">
+            <span class="material-icons mi-sm">people</span>
             Suspects ({{ unlockedSuspects().length }})
           </div>
           @if (unlockedSuspects().length === 0) {
@@ -96,7 +118,8 @@ import {
             class="mt-auto w-full py-2 px-3 text-xs font-mono uppercase tracking-widest rounded border cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-80 transition-opacity"
             style="border-color: var(--color-accent); color: var(--color-accent);"
           >
-            Use Hint ({{ hintsRemaining() }} left)
+            <span class="material-icons mi-sm">lightbulb</span>
+          Use Hint ({{ hintsRemaining() }} left)
           </button>
         </aside>
 
@@ -125,7 +148,11 @@ import {
                 {{ selectedEvent()?.title }}
               </h2>
             </div>
-            <app-puzzle-frame [puzzle]="activePuzzle()!" (puzzleSolved)="onPuzzleSolved($event)" />
+            <app-puzzle-frame
+              [puzzle]="activePuzzle()!"
+              [rewardClue]="activePuzzleRewardClue()"
+              (puzzleSolved)="onPuzzleSolved($event)"
+            />
           } @else if (selectedEvent()) {
             <!-- Narration / Investigation Mode -->
             <div class="max-w-2xl">
@@ -140,7 +167,8 @@ import {
                   <h3
                     class="font-mono text-xs uppercase text-(--color-text-muted) tracking-widest mb-3"
                   >
-                    Evidence Found
+                    <span class="material-icons mi-sm">article</span>
+                  Evidence Found
                   </h3>
                   <div class="flex flex-col gap-3">
                     @for (clue of recentClues(); track clue.id) {
@@ -155,7 +183,8 @@ import {
                 class="px-6 py-2.5 rounded border font-mono uppercase tracking-widest text-sm cursor-pointer hover:opacity-80 transition-opacity"
                 style="border-color: var(--color-accent); color: var(--color-accent);"
               >
-                Continue
+                <span class="material-icons mi-sm">arrow_forward</span>
+              Continue
               </button>
             </div>
           } @else {
@@ -177,15 +206,16 @@ import {
                   style="background: var(--color-secondary); border-color: rgba(201,168,76,0.3);"
                 >
                   <div class="flex items-start gap-3">
-                    <span class="text-xl">{{ categoryIcon(event.category) }}</span>
+                    <span class="material-icons mi-lg text-(--color-accent) opacity-70">{{ categoryIcon(event.category) }}</span>
                     <div class="flex-1">
                       <h3 class="font-heading text-(--color-accent) mb-0.5">{{ event.title }}</h3>
                       <p class="text-sm text-(--color-text) opacity-80">{{ event.description }}</p>
                       @if (event.isMandatory) {
                         <span
-                          class="inline-block mt-1.5 px-2 py-0.5 text-xs font-mono rounded"
+                          class="inline-flex items-center gap-1 mt-1.5 px-2 py-0.5 text-xs font-mono rounded"
                           style="border: 1px solid rgba(251,191,36,0.5); color: rgb(251,191,36);"
                         >
+                          <span class="material-icons mi-sm">star</span>
                           Required
                         </span>
                       }
@@ -204,6 +234,7 @@ import {
                   class="px-8 py-3 rounded font-mono uppercase tracking-widest text-sm cursor-pointer hover:opacity-80 transition-opacity"
                   style="border: 1px solid rgb(185,28,28); background: rgba(127,29,29,0.3); color: rgb(252,165,165);"
                 >
+                  <span class="material-icons mi-sm">gavel</span>
                   Make Your Accusation
                 </button>
               </div>
@@ -216,7 +247,8 @@ import {
           class="w-56 shrink-0 flex flex-col gap-3 p-4 overflow-y-auto"
           style="border-left: var(--border-style); min-height: calc(100vh - 3.5rem);"
         >
-          <div class="font-mono text-xs text-(--color-text-muted) uppercase tracking-widest">
+          <div class="font-mono text-xs text-(--color-text-muted) uppercase tracking-widest flex items-center gap-1.5">
+            <span class="material-icons mi-sm">inventory_2</span>
             Evidence ({{ foundClues().length }})
           </div>
           @if (foundClues().length === 0) {
@@ -227,6 +259,53 @@ import {
           }
         </aside>
       </div>
+
+      <!-- Hint Modal Overlay -->
+      @if (activeHint()) {
+        <div
+          class="fixed inset-0 z-60 flex items-center justify-center p-6"
+          style="background: rgba(0,0,0,0.75);"
+          (click)="dismissHint()"
+        >
+          <div
+            class="fade-in w-full max-w-md rounded-lg p-8 flex flex-col gap-5 shadow-2xl"
+            style="background: var(--color-surface); border: var(--border-style);"
+            (click)="$event.stopPropagation()"
+          >
+            <div class="flex items-center gap-3">
+              <span class="material-icons mi-xl text-(--color-accent) shrink-0">psychology</span>
+              <h3 class="font-heading text-(--color-accent) text-xl font-semibold">
+                Detective's Hint
+              </h3>
+            </div>
+            <p class="font-body text-(--color-text) text-base leading-relaxed">
+              {{ activeHint()!.text }}
+            </p>
+            @if (activeHint()!.targetsEventId) {
+              <p class="font-mono text-xs text-(--color-text-muted) italic">
+                This hint relates to: {{ activeHint()!.targetsEventId }}
+              </p>
+            }
+            <div
+              class="flex items-center justify-between pt-4 border-t"
+              style="border-color: rgba(201,168,76,0.2);"
+            >
+              <span class="font-mono text-xs text-(--color-text-muted)">
+                {{ hintsRemaining() }} hint{{ hintsRemaining() === 1 ? '' : 's' }} remaining
+              </span>
+              <button
+                type="button"
+                (click)="dismissHint()"
+                class="px-4 py-1.5 text-xs font-mono uppercase tracking-widest rounded border cursor-pointer hover:opacity-80 transition-opacity"
+                style="border-color: var(--color-accent); color: var(--color-accent);"
+              >
+                <span class="material-icons mi-sm">check</span>
+                Got it
+              </button>
+            </div>
+          </div>
+        </div>
+      }
 
       <!-- Act Banner Overlay -->
       @if (showActBanner()) {
@@ -256,6 +335,8 @@ export class InvestigationView implements OnInit {
   readonly actBannerSummary = signal('');
   readonly currentActForBanner = signal<1 | 2 | 3>(1);
   readonly recentClueIds = signal<string[]>([]);
+  readonly sidebarOpen = signal(true);
+  readonly activeHint = signal<Hint | null>(null);
 
   readonly gameState = this.gsvc.state;
   readonly isAccusationUnlocked = this.gsvc.isAccusationUnlocked;
@@ -291,6 +372,12 @@ export class InvestigationView implements OnInit {
     const event = this.selectedEvent();
     if (!event?.puzzleId) return null;
     return this.casePackage()?.puzzles.find((p) => p.id === event.puzzleId) ?? null;
+  });
+
+  readonly activePuzzleRewardClue = computed((): Clue | null => {
+    const puzzle = this.activePuzzle();
+    if (!puzzle?.rewardedClueId) return null;
+    return this.casePackage()?.clues.find((c) => c.id === puzzle.rewardedClueId) ?? null;
   });
 
   readonly recentClues = computed((): Clue[] => {
@@ -401,9 +488,14 @@ export class InvestigationView implements OnInit {
     if (!pkg || !state || !this.hasMoreHints()) return;
     const hint = pkg.hintLadder[state.hintsUsed];
     if (hint) {
-      this.toast.show(hint.text, 'info');
       this.gsvc.useHint();
+      // Brief delay builds tension before revealing the hint
+      setTimeout(() => this.activeHint.set(hint), 400);
     }
+  }
+
+  dismissHint(): void {
+    this.activeHint.set(null);
   }
 
   goAccuse(): void {
@@ -424,13 +516,13 @@ export class InvestigationView implements OnInit {
 
   categoryIcon(category: InvestigationEvent['category']): string {
     const icons: Record<InvestigationEvent['category'], string> = {
-      investigation: '🔍',
-      social: '💬',
-      surprise: '⚡',
-      puzzle: '🧩',
-      deduction: '🎯',
+      investigation: 'search',
+      social: 'record_voice_over',
+      surprise: 'bolt',
+      puzzle: 'extension',
+      deduction: 'track_changes',
     };
-    return icons[category] ?? '📋';
+    return icons[category] ?? 'folder';
   }
 
   private completeCurrentEvent(event: InvestigationEvent): void {

@@ -1,6 +1,6 @@
 import { Component, input, output, signal, computed, inject, HostListener } from '@angular/core';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
-import { PuzzleEvent } from '../../models';
+import { PuzzleEvent, Clue } from '../../models';
 
 @Component({
   selector: 'app-puzzle-frame',
@@ -16,11 +16,33 @@ import { PuzzleEvent } from '../../models';
         <p class="text-(--color-text) text-sm opacity-70">{{ puzzle().description }}</p>
       </div>
 
+      <!-- Reward clue preview (blurred until solved) -->
+      @if (rewardClue()) {
+        <div
+          class="flex items-center gap-3 p-3 rounded border transition-all duration-700"
+          style="border-color: rgba(201,168,76,0.2); background: var(--color-secondary);"
+          [class.blur-sm]="!solved()"
+          [class.opacity-50]="!solved()"
+        >
+          <span class="material-icons mi-lg text-(--color-accent)">{{ solved() ? 'manage_search' : 'lock' }}</span>
+          <div class="flex-1 min-w-0">
+            <p class="font-heading text-sm text-(--color-accent) truncate">
+              {{ solved() ? rewardClue()!.name : 'Reward Clue — Solve to unlock' }}
+            </p>
+            @if (solved()) {
+              <p class="text-xs text-(--color-text) mt-0.5 opacity-80">
+                {{ rewardClue()!.description }}
+              </p>
+            }
+          </div>
+        </div>
+      }
+
       <!-- Sandboxed puzzle iframe -->
       <div
         class="w-full rounded overflow-hidden border transition-opacity"
         style="border-color: rgba(201,168,76,0.2);"
-        [class.opacity-50]="solved()"
+        [class.opacity-40]="solved()"
       >
         <!-- srcdoc bound to sanitized SafeHtml — iframe is sandboxed allow-scripts only, no allow-same-origin -->
         <iframe
@@ -32,10 +54,19 @@ import { PuzzleEvent } from '../../models';
         </iframe>
       </div>
 
-      <!-- Solved banner -->
+      <!-- Solved banner with animation -->
       @if (solved()) {
-        <div class="rounded border border-green-600/40 bg-green-900/20 p-4 text-green-400 text-sm">
-          ✓ Puzzle solved! Reward clue unlocked.
+        <div
+          class="rounded border border-green-600/40 bg-green-900/20 p-4 text-green-400 text-sm flex items-center gap-2"
+        >
+          <span class="material-icons mi-md">task_alt</span>
+          <span
+            >Puzzle solved!{{
+              rewardClue()
+                ? ' "' + rewardClue()!.name + '" has been added to your evidence.'
+                : ' Reward unlocked.'
+            }}</span
+          >
         </div>
       }
 
@@ -53,8 +84,9 @@ import { PuzzleEvent } from '../../models';
           <button
             type="button"
             (click)="showNextHint()"
-            class="self-start text-xs text-(--color-accent) hover:underline transition-colors opacity-70 hover:opacity-100 cursor-pointer"
+            class="self-start text-xs text-(--color-accent) hover:underline transition-colors opacity-70 hover:opacity-100 cursor-pointer flex items-center gap-1"
           >
+            <span class="material-icons mi-sm">help_outline</span>
             Need a hint? ({{ puzzle().hints.length - shownHints().length }} remaining)
           </button>
         }
@@ -64,6 +96,8 @@ import { PuzzleEvent } from '../../models';
 })
 export class PuzzleFrameComponent {
   readonly puzzle = input.required<PuzzleEvent>();
+  /** Optional: pass the actual Clue object for the reward preview. */
+  readonly rewardClue = input<Clue | null>(null);
   readonly puzzleSolved = output<string>();
 
   readonly solved = signal(false);
@@ -88,7 +122,7 @@ export class PuzzleFrameComponent {
       !this.solved()
     ) {
       this.solved.set(true);
-      this.puzzleSolved.emit(this.puzzle().id);
+      this.puzzleSolved.emit(this.puzzle().rewardedClueId);
     }
   }
 

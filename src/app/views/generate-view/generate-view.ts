@@ -25,16 +25,18 @@ type Difficulty = 'easy' | 'normal' | 'hard' | 'genius';
         <button
           type="button"
           (click)="generate()"
-          class="px-8 py-3 rounded border font-mono uppercase tracking-widest text-sm cursor-pointer transition-opacity hover:opacity-80"
+          class="px-8 py-3 rounded border font-mono uppercase tracking-widest text-sm cursor-pointer transition-opacity hover:opacity-80 flex items-center gap-2"
           style="border-color: var(--color-accent); color: var(--color-accent);"
         >
+          <span class="material-icons mi-sm">refresh</span>
           Try Again
         </button>
         <button
           type="button"
           (click)="goHome()"
-          class="text-(--color-text) text-sm opacity-50 hover:opacity-80 cursor-pointer underline"
+          class="text-(--color-text) text-sm opacity-50 hover:opacity-80 cursor-pointer underline flex items-center gap-1"
         >
+          <span class="material-icons mi-sm">home</span>
           Back to Home
         </button>
       </div>

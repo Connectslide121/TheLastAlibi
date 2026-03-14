@@ -31,12 +31,18 @@ import { CasePackage, Suspect, Clue } from '../../models';
           >
             {{ isCorrect() ? 'Case Solved' : 'Wrong Accusation' }}
           </p>
-          <h1
-            class="font-heading text-4xl mb-3"
+          <div class="flex items-center justify-center gap-3 mb-2">
+            <span
+              class="material-icons text-5xl"
+              [style.color]="isCorrect() ? 'rgb(134,239,172)' : 'rgb(252,165,165)'"
+            >{{ isCorrect() ? 'emoji_events' : 'error' }}</span>
+            <h1
+            class="font-heading text-4xl"
             [style.color]="isCorrect() ? 'rgb(134,239,172)' : 'rgb(252,165,165)'"
           >
             {{ isCorrect() ? 'Brilliant Deduction!' : 'Not Quite…' }}
           </h1>
+          </div>
           <p class="text-(--color-text) max-w-lg mx-auto">
             @if (isCorrect()) {
               You correctly identified <strong>{{ culprit()?.name }}</strong> as the culprit.
@@ -45,6 +51,44 @@ import { CasePackage, Suspect, Clue } from '../../models';
               >, but the truth is more complicated.
             }
           </p>
+
+          <!-- Score & Grade -->
+          <div class="flex items-center justify-center gap-6 mt-6">
+            <div class="flex flex-col items-center gap-1">
+              <div class="flex items-center gap-1">
+                <span class="material-icons mi-sm opacity-60" [style.color]="grade().colour">military_tech</span>
+                <span
+                  class="font-heading text-6xl font-bold leading-none"
+                  [style.color]="grade().colour"
+                >{{ grade().letter }}</span>
+              </div>
+              <span class="font-mono text-xs uppercase tracking-widest opacity-60" [style.color]="grade().colour">
+                {{ grade().label }}
+              </span>
+            </div>
+            <div
+              class="w-px h-12 opacity-20"
+              style="background: currentColor;"
+            ></div>
+            <div class="flex flex-col items-center gap-1">
+              <span class="font-heading text-4xl font-bold text-(--color-accent)">{{ score() }}</span>
+              <span class="font-mono text-xs uppercase tracking-widest text-(--color-text-muted)">points</span>
+            </div>
+          </div>
+
+          <!-- Score breakdown -->
+          <div class="mt-3 font-mono text-xs text-(--color-text-muted) flex flex-wrap gap-x-5 gap-y-1 justify-center">
+            <span>Base: 1000</span>
+            @if (gameState()?.hintsUsed) {
+              <span>Hints: −{{ (gameState()?.hintsUsed ?? 0) * 50 }}</span>
+            }
+            @if (!isCorrect()) {
+              <span>Wrong accusation: −100</span>
+            }
+            @if ((gameState()?.interviewedSuspectIds?.length ?? 0) > 1) {
+              <span>Extra interviews: −{{ ((gameState()?.interviewedSuspectIds?.length ?? 1) - 1) * 10 }}</span>
+            }
+          </div>
         </div>
 
         <!-- Culprit Reveal -->
@@ -63,7 +107,7 @@ import { CasePackage, Suspect, Clue } from '../../models';
               <div
                 class="w-24 h-24 rounded-full flex items-center justify-center text-4xl bg-(--color-surface) shrink-0"
               >
-                🧑
+                <span class="material-icons mi-2xl text-(--color-text-muted)">person</span>
               </div>
             }
             <div>
@@ -95,16 +139,17 @@ import { CasePackage, Suspect, Clue } from '../../models';
         <!-- Steps Explained -->
         @if (casePackage()?.solutionExplanation?.stepsExplained?.length) {
           <section class="px-6 pb-6 max-w-3xl mx-auto w-full">
-            <h2 class="font-heading text-xl text-(--color-accent) mb-4">Step by Step</h2>
+            <h2 class="font-heading text-xl text-(--color-accent) mb-4 flex items-center gap-2">
+            <span class="material-icons mi-lg">format_list_numbered</span>
+            Step by Step
+          </h2>
             <div class="flex flex-col gap-3">
               @for (step of visibleSteps(); track $index) {
                 <div
                   class="flex gap-3 p-4 rounded-lg"
                   style="background: var(--color-secondary); border: var(--border-style);"
                 >
-                  <span class="font-mono text-sm text-(--color-accent) shrink-0 w-6 text-center">
-                    {{ $index + 1 }}.
-                  </span>
+                  <span class="material-icons mi-sm text-(--color-accent) shrink-0 mt-0.5">check_circle</span>
                   <p class="text-sm text-(--color-text)">{{ step }}</p>
                 </div>
               }
@@ -113,10 +158,11 @@ import { CasePackage, Suspect, Clue } from '../../models';
               <button
                 type="button"
                 (click)="nextStep()"
-                class="mt-4 px-6 py-2.5 rounded border font-mono uppercase tracking-widest text-sm cursor-pointer hover:opacity-80 transition-opacity"
+                class="mt-4 px-6 py-2.5 rounded border font-mono uppercase tracking-widest text-sm cursor-pointer hover:opacity-80 transition-opacity flex items-center gap-2"
                 style="border-color: var(--color-accent); color: var(--color-accent);"
               >
-                Next →
+                <span class="material-icons mi-sm">navigate_next</span>
+                Next
               </button>
             }
           </section>
@@ -127,7 +173,10 @@ import { CasePackage, Suspect, Clue } from '../../models';
           showRedHerrings() && casePackage()?.solutionExplanation?.redHerringExplanations?.length
         ) {
           <section class="px-6 pb-6 max-w-3xl mx-auto w-full">
-            <h2 class="font-heading text-xl text-(--color-accent) mb-3">About the Red Herrings</h2>
+            <h2 class="font-heading text-xl text-(--color-accent) mb-3 flex items-center gap-2">
+            <span class="material-icons mi-lg">warning</span>
+            About the Red Herrings
+          </h2>
             <div class="flex flex-col gap-2">
               @for (
                 exp of casePackage()!.solutionExplanation.redHerringExplanations;
@@ -149,8 +198,9 @@ import { CasePackage, Suspect, Clue } from '../../models';
             <button
               type="button"
               (click)="showRedHerrings.set(true)"
-              class="text-sm font-mono text-(--color-text-muted) underline cursor-pointer hover:opacity-80"
+              class="text-sm font-mono text-(--color-text-muted) underline cursor-pointer hover:opacity-80 flex items-center gap-1"
             >
+              <span class="material-icons mi-sm">expand_more</span>
               Show red herring explanations
             </button>
           </div>
@@ -159,13 +209,19 @@ import { CasePackage, Suspect, Clue } from '../../models';
         <!-- Timeline Reveal -->
         @if (currentStep() >= totalSteps() - 1) {
           <section class="px-6 pb-6 max-w-3xl mx-auto w-full">
-            <h2 class="font-heading text-xl text-(--color-accent) mb-4">The Real Timeline</h2>
+            <h2 class="font-heading text-xl text-(--color-accent) mb-4 flex items-center gap-2">
+            <span class="material-icons mi-lg">timeline</span>
+            The Real Timeline
+          </h2>
             <app-timeline [events]="casePackage()!.timeline" [revealTruth]="true" />
           </section>
 
           <!-- All Clues with Truth -->
           <section class="px-6 pb-6 max-w-3xl mx-auto w-full">
-            <h2 class="font-heading text-xl text-(--color-accent) mb-4">All Evidence Reviewed</h2>
+            <h2 class="font-heading text-xl text-(--color-accent) mb-4 flex items-center gap-2">
+            <span class="material-icons mi-lg">article</span>
+            All Evidence Reviewed
+          </h2>
             <div class="flex flex-col gap-3">
               @for (clue of allClues(); track clue.id) {
                 <app-clue-card [clue]="clue" [showTruth]="true" />
@@ -178,9 +234,10 @@ import { CasePackage, Suspect, Clue } from '../../models';
             <button
               type="button"
               (click)="playAgain()"
-              class="px-10 py-3 rounded-lg border font-mono uppercase tracking-widest text-sm cursor-pointer hover:opacity-80 transition-opacity"
+              class="px-10 py-3 rounded-lg border font-mono uppercase tracking-widest text-sm cursor-pointer hover:opacity-80 transition-opacity flex items-center gap-2"
               style="border-color: var(--color-accent); color: var(--color-accent);"
             >
+              <span class="material-icons mi-sm">replay</span>
               Play Again
             </button>
           </div>
@@ -236,6 +293,44 @@ export class RevealView implements OnInit {
   readonly visibleSteps = computed((): string[] => {
     const steps = this.casePackage()?.solutionExplanation.stepsExplained ?? [];
     return steps.slice(0, this.currentStep() + 1);
+  });
+
+  readonly score = computed((): number => {
+    const pkg = this.casePackage();
+    const state = this.gameState();
+    if (!pkg || !state) return 0;
+
+    let points = 1000;
+
+    // Deduct for hints
+    points -= state.hintsUsed * 50;
+
+    // Deduct 100 for wrong accusation
+    if (!this.isCorrect()) points -= 100;
+
+    // Deduct 10 per suspect interviewed beyond the culprit alone
+    const excessInterviews = Math.max(0, state.interviewedSuspectIds.length - 1);
+    points -= excessInterviews * 10;
+
+    // Bonus 200 if all red-herring clues were found
+    const redHerringIds = pkg.truth.redHerringClueIds;
+    if (
+      redHerringIds.length > 0 &&
+      redHerringIds.every((id) => state.foundClueIds.includes(id))
+    ) {
+      points += 200;
+    }
+
+    return Math.max(0, points);
+  });
+
+  readonly grade = computed((): { letter: string; colour: string; label: string } => {
+    const s = this.score();
+    if (s >= 900) return { letter: 'S', colour: 'rgb(250,204,21)', label: 'Master Detective' };
+    if (s >= 750) return { letter: 'A', colour: 'rgb(134,239,172)', label: 'Excellent Work' };
+    if (s >= 600) return { letter: 'B', colour: 'rgb(147,197,253)', label: 'Good Investigation' };
+    if (s >= 400) return { letter: 'C', colour: 'rgb(253,186,116)', label: 'Adequate' };
+    return { letter: 'F', colour: 'rgb(252,165,165)', label: 'Back to the Academy' };
   });
 
   ngOnInit(): void {

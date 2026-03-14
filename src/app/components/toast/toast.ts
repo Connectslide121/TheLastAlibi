@@ -28,18 +28,21 @@ import { ToastService } from './toast.service';
       @for (toast of toastService.toasts(); track toast.id) {
         <div
           (click)="toastService.dismiss(toast.id)"
-          class="flex items-center gap-3 rounded border px-4 py-3 shadow-lg text-sm max-w-sm pointer-events-auto cursor-pointer transition-all duration-300"
+          class="flex items-center gap-2 rounded border px-4 py-3 shadow-lg text-sm max-w-sm pointer-events-auto cursor-pointer transition-all duration-300"
           [class.toast-info]="toast.type === 'info'"
           [class.toast-success]="toast.type === 'success'"
           [class.toast-warning]="toast.type === 'warning'"
         >
-          <span>{{ toast.message }}</span>
+          <span class="material-icons mi-sm shrink-0 opacity-70">
+            {{ toast.type === 'success' ? 'check_circle' : toast.type === 'warning' ? 'warning' : 'info' }}
+          </span>
+          <span class="flex-1">{{ toast.message }}</span>
           <button
             type="button"
-            class="ml-auto opacity-50 hover:opacity-100 text-xs leading-none cursor-pointer"
+            class="ml-auto opacity-50 hover:opacity-100 leading-none cursor-pointer"
             aria-label="Dismiss"
           >
-            ✕
+            <span class="material-icons mi-sm">close</span>
           </button>
         </div>
       }

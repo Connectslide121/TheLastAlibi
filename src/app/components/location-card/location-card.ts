@@ -23,7 +23,7 @@ import { Location as GameLocation } from '../../models';
             class="w-full h-full object-cover"
           />
         } @else {
-          <span class="text-sm italic opacity-30">[ No Image ]</span>
+          <span class="material-icons mi-2xl opacity-20">location_city</span>
         }
       </div>
 
@@ -35,7 +35,10 @@ import { Location as GameLocation } from '../../models';
           {{ location().atmosphere }}
         </p>
         @if (isVisited()) {
-          <span class="text-xs text-green-400 opacity-80 mt-1">✓ Visited</span>
+          <span class="text-xs text-green-400 opacity-80 mt-1 flex items-center gap-1">
+            <span class="material-icons mi-sm">where_to_vote</span>
+            Visited
+          </span>
         }
       </div>
     </button>

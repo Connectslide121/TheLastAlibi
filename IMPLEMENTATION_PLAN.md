@@ -421,58 +421,58 @@
 ## Phase 5 – Evidence Board (Detailed Implementation)
 
 ### 5.1 Canvas & Positioning
-- [ ] Use an absolutely positioned `div` container as the board canvas
-- [ ] Store card positions as `{ x: number, y: number }` in game state
-- [ ] Implement drag-and-drop using Angular's `CDK DragDrop` or native pointer events
-- [ ] Ensure cards stay within board bounds
+- [x] Use an absolutely positioned `div` container as the board canvas
+- [x] Store card positions as `{ x: number, y: number }` in game state
+- [x] Implement drag-and-drop using Angular's `CDK DragDrop` or native pointer events
+- [x] Ensure cards stay within board bounds
 
 ### 5.2 Connection Lines
-- [ ] Use an `<svg>` overlay covering the full board canvas for drawing lines
-- [ ] Store connections as pairs of card IDs in game state
-- [ ] Render an `<line>` SVG element for each connection pair using card center coordinates
-- [ ] Allow removing a connection by clicking its midpoint
+- [x] Use an `<svg>` overlay covering the full board canvas for drawing lines
+- [x] Store connections as pairs of card IDs in game state
+- [x] Render an `<line>` SVG element for each connection pair using card center coordinates
+- [x] Allow removing a connection by clicking its midpoint
 
 ### 5.3 Notes
-- [ ] Implement sticky note component: double-click blank board area to create a note
-- [ ] Note is an editable `<textarea>` that saves on blur
-- [ ] Notes are draggable like cards
-- [ ] Notes stored in `GameState.evidenceBoardNotes`
+- [x] Implement sticky note component: double-click blank board area to create a note
+- [x] Note is an editable `<textarea>` that saves on blur
+- [x] Notes are draggable like cards
+- [x] Notes stored in `GameState.evidenceBoardNotes`
 
 ### 5.4 Contradiction Markers
-- [ ] After the player discovers a contradiction (deduction event), add a red marker icon to relating cards
-- [ ] Show tooltip explaining the contradiction on hover
+- [x] After the player discovers a contradiction (deduction event), add a red marker icon to relating cards
+- [x] Show tooltip explaining the contradiction on hover
 
 ---
 
 ## Phase 6 – Puzzle System (Detailed Implementation)
 
 ### 6.1 Sandboxed Iframe Rendering
-- [ ] Puzzle `htmlComponent` is injected as the `srcdoc` attribute of a sandboxed iframe
-- [ ] Sandbox attribute: `sandbox="allow-scripts"` only — no allow-same-origin, no allow-forms
-- [ ] Puzzle HTML must call `window.parent.postMessage({ type: 'PUZZLE_SOLVED', puzzleId: '...' }, '*')` on completion
-- [ ] Game component listens for this message and validates the `puzzleId` matches current puzzle
+- [x] Puzzle `htmlComponent` is injected as the `srcdoc` attribute of a sandboxed iframe
+- [x] Sandbox attribute: `sandbox="allow-scripts"` only — no allow-same-origin, no allow-forms
+- [x] Puzzle HTML must call `window.parent.postMessage({ type: 'PUZZLE_SOLVED', puzzleId: '...' }, '*')` on completion
+- [x] Game component listens for this message and validates the `puzzleId` matches current puzzle
 
 ### 6.2 Puzzle LLM Prompt
-- [ ] Design a specific sub-prompt for puzzle generation requesting self-contained HTML
-- [ ] Specify that all CSS and JS must be inline within the HTML string
-- [ ] Specify the postMessage protocol in the prompt
-- [ ] Include type hints and constraints (no external fetch calls, no localStorage)
+- [x] Design a specific sub-prompt for puzzle generation requesting self-contained HTML
+- [x] Specify that all CSS and JS must be inline within the HTML string
+- [x] Specify the postMessage protocol in the prompt
+- [x] Include type hints and constraints (no external fetch calls, no localStorage)
 
 ### 6.3 Puzzle UI Wrapper
-- [ ] Puzzle frame shows title and description above iframe
-- [ ] Show "Need a hint?" button — reveals next hint from `PuzzleEvent.hints`
-- [ ] Show reward clue preview (blurred) to motivate completion
-- [ ] On puzzle completion: animate reward clue reveal
+- [x] Puzzle frame shows title and description above iframe
+- [x] Show "Need a hint?" button — reveals next hint from `PuzzleEvent.hints`
+- [x] Show reward clue preview (blurred) to motivate completion
+- [x] On puzzle completion: animate reward clue reveal
 
 ---
 
 ## Phase 7 – Session Generation Prompt Engineering
 
 ### 7.1 Master Prompt Design
-- [ ] Write the full master system prompt for case generation
-- [ ] Instruct the LLM to return a single valid JSON object (no markdown fences)
-- [ ] Include the full `CasePackage` schema as a comment or JSON schema in the prompt
-- [ ] Include constraints:
+- [x] Write the full master system prompt for case generation
+- [x] Instruct the LLM to return a single valid JSON object (no markdown fences)
+- [x] Include the full `CasePackage` schema as a comment or JSON schema in the prompt
+- [x] Include constraints:
   - All `id` fields must be unique strings
   - `truthLayer.culpritId` must reference a real `Suspect.id`
   - `truthLayer.importantClueId` must reference a real `Clue.id`
@@ -482,80 +482,80 @@
   - Puzzles must be self-contained HTML
 
 ### 7.2 Prompt Parameterization
-- [ ] Inject `difficulty` into the prompt to scale complexity
-- [ ] Inject `stylePreference` (art style) into the visual direction section
-- [ ] Allow an `era` or `genre` injected parameter for setting flavor (e.g. "1920s Paris", "futuristic space station")
+- [x] Inject `difficulty` into the prompt to scale complexity
+- [x] Inject `stylePreference` (art style) into the visual direction section
+- [x] Allow an `era` or `genre` injected parameter for setting flavor (e.g. "1920s Paris", "futuristic space station")
 
 ### 7.3 Response Validation
-- [ ] After parsing LLM response, validate that all cross-references (IDs) are consistent
-- [ ] If validation fails, attempt correction with a follow-up prompt
-- [ ] Log all validation failures for debugging
+- [x] After parsing LLM response, validate that all cross-references (IDs) are consistent
+- [x] If validation fails, attempt correction with a follow-up prompt
+- [x] Log all validation failures for debugging
 
 ---
 
 ## Phase 8 – Theming & Visual Polish
 
 ### 8.1 CSS Variables System
-- [ ] Define all theme CSS variables in `styles.css` with defaults
-- [ ] Ensure all component styles use `var(--color-*)` instead of hardcoded colors
-- [ ] `ThemeService.applyTheme()` sets CSS variables on `:root` element
+- [x] Define all theme CSS variables in `styles.css` with defaults
+- [x] Ensure all component styles use `var(--color-*)` instead of hardcoded colors
+- [x] `ThemeService.applyTheme()` sets CSS variables on `:root` element
 
 ### 8.2 Texture Overlays
-- [ ] Add texture image assets to `src/assets/textures/` (paper, cork, grain, metal, leather)
-- [ ] Define CSS classes `.texture-paper`, `.texture-cork`, `.texture-grain`, etc.
-- [ ] Each class applies the texture as a `::before` pseudo-element with low opacity (0.05–0.15)
-- [ ] Body gets a `data-texture` attribute set by `ThemeService`, which activates matching texture class
+- [x] Add texture image assets to `src/assets/textures/` (paper, cork, grain, metal, leather)
+- [x] Define CSS classes `.texture-paper`, `.texture-cork`, `.texture-grain`, etc.
+- [x] Each class applies the texture as a `::before` pseudo-element with low opacity (0.05–0.15)
+- [x] Body gets a `data-texture` attribute set by `ThemeService`, which activates matching texture class
 
 ### 8.3 Typography
-- [ ] Import 2–3 Google Fonts suitable for detective/noir aesthetic (e.g. Playfair Display, Special Elite, Courier Prime)
-- [ ] Map `artStyle` values to specific font pairings
-- [ ] Apply fonts via CSS variables: `--font-heading`, `--font-body`, `--font-mono`
+- [x] Import 2–3 Google Fonts suitable for detective/noir aesthetic (e.g. Playfair Display, Special Elite, Courier Prime)
+- [x] Map `artStyle` values to specific font pairings
+- [x] Apply fonts via CSS variables: `--font-heading`, `--font-body`, `--font-mono`
 
 ### 8.4 Animations
-- [ ] Page transition fade on route changes
-- [ ] Clue card flip animation on discovery
-- [ ] Suspect card slide-in on unlock
-- [ ] Dialogue text reveal (character-by-character or line fade)
-- [ ] Act banner cinematic entrance animation
+- [x] Page transition fade on route changes
+- [x] Clue card flip animation on discovery
+- [x] Suspect card slide-in on unlock
+- [x] Dialogue text reveal (character-by-character or line fade)
+- [x] Act banner cinematic entrance animation
 
 ### 8.5 Responsive Layout
-- [ ] Investigation View adapts: sidebar collapses to drawer on mobile
-- [ ] Evidence board uses full-screen view on mobile
-- [ ] Cards are touch-draggable on mobile devices
+- [x] Investigation View adapts: sidebar collapses to drawer on mobile
+- [x] Evidence board uses full-screen view on mobile
+- [x] Cards are touch-draggable on mobile devices
 
 ---
 
 ## Phase 9 – Hint System
 
-- [ ] Implement `HintService` or integrate hints into `GameStateService`
-- [ ] Track `GameState.hintsUsed` — gate number of available hints per act
-- [ ] "Request Hint" button in Investigation View sidebar
-- [ ] On click: reveal the next hint in the `CasePackage.hintLadder` sequence
-- [ ] Hints are displayed in a modal with a slight delay to build tension
-- [ ] Bonus: show a "cost" for hints (e.g. deducts "detective rating")
+- [x] Implement `HintService` or integrate hints into `GameStateService`
+- [x] Track `GameState.hintsUsed` — gate number of available hints per act
+- [x] "Request Hint" button in Investigation View sidebar
+- [x] On click: reveal the next hint in the `CasePackage.hintLadder` sequence
+- [x] Hints are displayed in a modal with a slight delay to build tension
+- [x] Bonus: show a "cost" for hints (e.g. deducts "detective rating")
 
 ---
 
 ## Phase 10 – Scoring & Detective Rating
 
-- [ ] Define scoring formula:
+- [x] Define scoring formula:
   - Base score: 1000 points
   - Deduct: 50 points per hint used
   - Deduct: 10 points per incorrect suspect interviewed (over minimum)
   - Deduct: 100 points if wrong culprit initially chosen
   - Add: 200 points for identifying all red herrings explicitly
-- [ ] Calculate rating after final accusation
-- [ ] Map score to letter grade: S / A / B / C / F
-- [ ] Display score and grade on the Reveal View
+- [x] Calculate rating after final accusation
+- [x] Map score to letter grade: S / A / B / C / F
+- [x] Display score and grade on the Reveal View
 
 ---
 
 ## Phase 11 – Saved Cases & Session Management
 
-- [ ] Home View shows list of saved cases from `CaseStoreService.listSavedCases()`
-- [ ] Each saved case shows: title, case type, difficulty, date saved, and continue button
-- [ ] "Delete Case" option per saved case (with confirmation)
-- [ ] New case warns if a case is already in progress
+- [x] Home View shows list of saved cases from `CaseStoreService.listSavedCases()`
+- [x] Each saved case shows: title, case type, difficulty, date saved, and continue button
+- [x] "Delete Case" option per saved case (with confirmation)
+- [x] New case warns if a case is already in progress
 
 ---
 
@@ -624,4 +624,4 @@
 
 ---
 
-*Last updated: Phase 4 � Complete ? (Phase 5 next)*
+*Last updated: Phase 11 � Complete ? (Phase 12 next)*

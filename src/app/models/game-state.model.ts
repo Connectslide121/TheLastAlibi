@@ -27,4 +27,10 @@ export interface GameState {
   hintsUsed: number;
   finalAccusation?: FinalAccusation;
   evidenceBoardNotes: EvidenceBoardNote[];
+  /** Keyed by card ID (suspect or clue) — persisted board layout */
+  boardCardPositions: Record<string, { x: number; y: number }>;
+  /** Sorted 'id1:id2' pairs representing drawn connections */
+  boardConnections: string[];
+  /** IDs of events that revealed a contradiction */
+  contradictionEventIds: string[];
 }

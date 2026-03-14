@@ -79,3 +79,158 @@ body {
 [data-texture='fabric']::before {
   background-image: url('/assets/textures/fabric.png');
 }
+/* pixel_noise — inline SVG feTurbulence, no external asset needed */
+[data-texture='pixel_noise']::before {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+  opacity: 0.04;
+}
+
+/* ============================================================
+   GLOBAL ANIMATIONS
+   ============================================================ */
+
+/* Route-level page entrance — applied to all top-level view selectors */
+app-home-view,
+app-generate-view,
+app-investigation-view,
+app-evidence-board-view,
+app-accusation-view,
+app-reveal-view {
+  display: block;
+  animation: routeFadeIn 0.35s ease-out both;
+}
+
+@keyframes routeFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Clue card entrance — flip reveal on mount */
+.clue-reveal-enter {
+  animation: clueReveal 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+}
+
+@keyframes clueReveal {
+  from {
+    opacity: 0;
+    transform: perspective(600px) rotateY(75deg) scale(0.85);
+  }
+  to {
+    opacity: 1;
+    transform: perspective(600px) rotateY(0deg) scale(1);
+  }
+}
+
+/* Suspect card entrance — slide in from left */
+.suspect-slide-in {
+  animation: suspectSlideIn 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+}
+
+@keyframes suspectSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Dialogue box entrance — slide up from bottom */
+.dialogue-enter {
+  animation: dialogueEnter 0.3s ease-out both;
+}
+
+@keyframes dialogueEnter {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Dialogue text — typewriter-style fade per line */
+.dialogue-text-reveal {
+  animation: dialogueTextReveal 0.4s ease-out both;
+}
+
+@keyframes dialogueTextReveal {
+  from {
+    opacity: 0;
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    opacity: 1;
+    clip-path: inset(0 0% 0 0);
+  }
+}
+
+/* Act banner title — dramatic scale entrance */
+.act-title-enter {
+  animation: actTitleEnter 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+  animation-delay: 0.15s;
+}
+
+@keyframes actTitleEnter {
+  from {
+    opacity: 0;
+    transform: scale(0.7) translateY(20px);
+    letter-spacing: 0.3em;
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+    letter-spacing: normal;
+  }
+}
+
+/* Generic fade-in utility */
+.fade-in {
+  animation: fadeIn 0.3s ease-out both;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Staggered animation delay helpers */
+.anim-delay-1 { animation-delay: 0.05s; }
+.anim-delay-2 { animation-delay: 0.10s; }
+.anim-delay-3 { animation-delay: 0.15s; }
+.anim-delay-4 { animation-delay: 0.20s; }
+.anim-delay-5 { animation-delay: 0.25s; }
+
+/* ============================================================
+   MATERIAL ICONS — sizing & colour helpers
+   ============================================================ */
+.material-icons {
+  font-size: 20px;
+  line-height: 1;
+  user-select: none;
+  vertical-align: middle;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Size variants */
+.mi-sm  { font-size: 16px; }
+.mi-md  { font-size: 20px; }
+.mi-lg  { font-size: 24px; }
+.mi-xl  { font-size: 32px; }
+.mi-2xl { font-size: 48px; }
+

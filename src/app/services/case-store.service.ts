@@ -3,9 +3,11 @@ import { Observable, from, of } from 'rxjs';
 import { catchError, map } from 'rxjs/operators';
 import { CasePackage } from '../models';
 
-interface SavedCaseSummary {
+export interface SavedCaseSummary {
   id: string;
   title: string;
+  caseType: string;
+  difficulty: string;
   savedAt: string;
 }
 
@@ -78,6 +80,8 @@ export class CaseStoreService {
                 results.push({
                   id: record.id,
                   title: record.metadata?.title ?? record.id,
+                  caseType: record.metadata?.caseType ?? 'unknown',
+                  difficulty: record.metadata?.difficulty ?? 'normal',
                   savedAt: record._savedAt ?? '',
                 });
                 cursor.continue();

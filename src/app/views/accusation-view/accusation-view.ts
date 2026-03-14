@@ -16,7 +16,10 @@ import { CasePackage, Suspect, Clue, FinalAccusation } from '../../models';
         class="px-6 py-4 bg-(--color-surface) shrink-0"
         style="border-bottom: var(--border-style);"
       >
-        <h1 class="font-heading text-2xl text-(--color-accent)">Make Your Accusation</h1>
+        <h1 class="font-heading text-2xl text-(--color-accent) flex items-center gap-3">
+          <span class="material-icons mi-xl">gavel</span>
+          Make Your Accusation
+        </h1>
         <p class="text-sm text-(--color-text-muted) mt-0.5 font-mono">
           {{ casePackage()?.metadata?.title }}
         </p>
@@ -60,7 +63,7 @@ import { CasePackage, Suspect, Clue, FinalAccusation } from '../../models';
                     <div
                       class="w-16 h-16 rounded-full flex items-center justify-center text-2xl bg-(--color-surface)"
                     >
-                      🧑
+                      <span class="material-icons mi-2xl text-(--color-text-muted)">person</span>
                     </div>
                   }
                   <span
@@ -148,9 +151,10 @@ import { CasePackage, Suspect, Clue, FinalAccusation } from '../../models';
             type="button"
             (click)="attemptSubmit()"
             [disabled]="!canSubmit()"
-            class="w-full py-3 rounded-lg font-mono uppercase tracking-widest text-sm cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-80 transition-opacity"
+            class="w-full py-3 rounded-lg font-mono uppercase tracking-widest text-sm cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-80 transition-opacity flex items-center justify-center gap-2"
             style="background: rgba(127,29,29,0.5); border: 1px solid rgb(185,28,28); color: rgb(252,165,165);"
           >
+            <span class="material-icons mi-sm">gavel</span>
             Submit My Theory
           </button>
         </div>
@@ -178,16 +182,18 @@ import { CasePackage, Suspect, Clue, FinalAccusation } from '../../models';
               <button
                 type="button"
                 (click)="confirmSubmit()"
-                class="flex-1 py-2.5 rounded font-mono uppercase tracking-widest text-sm cursor-pointer hover:opacity-80 transition-opacity"
+                class="flex-1 py-2.5 rounded font-mono uppercase tracking-widest text-sm cursor-pointer hover:opacity-80 transition-opacity flex items-center justify-center gap-1.5"
                 style="background: rgba(127,29,29,0.5); border: 1px solid rgb(185,28,28); color: rgb(252,165,165);"
               >
+                <span class="material-icons mi-sm">gavel</span>
                 Yes, I'm sure
               </button>
               <button
                 type="button"
                 (click)="showConfirmation.set(false)"
-                class="flex-1 py-2.5 rounded border font-mono uppercase tracking-widest text-sm cursor-pointer hover:opacity-80 transition-opacity border-(--color-text-muted) text-(--color-text-muted)"
+                class="flex-1 py-2.5 rounded border font-mono uppercase tracking-widest text-sm cursor-pointer hover:opacity-80 transition-opacity border-(--color-text-muted) text-(--color-text-muted) flex items-center justify-center gap-1.5"
               >
+                <span class="material-icons mi-sm">arrow_back</span>
                 Wait, let me think
               </button>
             </div>

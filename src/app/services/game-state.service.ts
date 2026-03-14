@@ -37,6 +37,9 @@ export class GameStateService {
       isAccusationUnlocked: false,
       evidenceBoardNotes: [],
       hintsUsed: 0,
+      boardCardPositions: {},
+      boardConnections: [],
+      contradictionEventIds: [],
     };
     this._state.set(fresh);
     this.persist(fresh);
@@ -187,6 +190,35 @@ export class GameStateService {
   removeEvidenceBoardNote(noteId: string): void {
     this.mutate((s) => {
       s.evidenceBoardNotes = s.evidenceBoardNotes.filter((n) => n.id !== noteId);
+    });
+  }
+
+  setBoardCardPosition(cardId: string, x: number, y: number): void {
+    this.mutate((s) => {
+      s.boardCardPositions = { ...s.boardCardPositions, [cardId]: { x, y } };
+    });
+  }
+
+  addBoardConnection(idA: string, idB: string): void {
+    const key = [idA, idB].sort().join(':');
+    this.mutate((s) => {
+      if (!s.boardConnections.includes(key)) {
+        s.boardConnections = [...s.boardConnections, key];
+      }
+    });
+  }
+
+  removeBoardConnection(key: string): void {
+    this.mutate((s) => {
+      s.boardConnections = s.boardConnections.filter((k) => k !== key);
+    });
+  }
+
+  markContradictionEvent(eventId: string): void {
+    this.mutate((s) => {
+      if (!s.contradictionEventIds.includes(eventId)) {
+        s.contradictionEventIds = [...s.contradictionEventIds, eventId];
+      }
     });
   }
 

@@ -17,15 +17,16 @@ import { Component, OnInit, OnDestroy, input, output, signal } from '@angular/co
         >
           Act {{ act() }}
         </p>
-        <h2 class="text-(--color-text) font-serif text-5xl font-bold mb-6 leading-tight">
+        <h2 class="act-title-enter text-(--color-text) font-serif text-5xl font-bold mb-6 leading-tight">
           {{ title() }}
         </h2>
         <p class="text-(--color-text) text-lg leading-relaxed opacity-70">
           {{ summary() }}
         </p>
         <p
-          class="text-(--color-text) text-xs mt-10 animate-pulse tracking-widest uppercase opacity-40"
+          class="text-(--color-text) text-xs mt-10 animate-pulse tracking-widest uppercase opacity-40 flex items-center justify-center gap-2"
         >
+          <span class="material-icons mi-sm">touch_app</span>
           Click anywhere to continue
         </p>
       </div>

@@ -8,7 +8,7 @@ import { Suspect } from '../../models';
     <button
       type="button"
       (click)="cardClicked.emit(suspect())"
-      class="w-full text-left rounded overflow-hidden border bg-(--color-surface) transition-all cursor-pointer"
+      class="suspect-slide-in w-full text-left rounded overflow-hidden border bg-(--color-surface) transition-all cursor-pointer"
       [class.opacity-70]="!isInterviewed()"
       [style.border-color]="isInterviewed() ? 'var(--color-accent)' : 'rgba(255,255,255,0.1)'"
     >
@@ -22,16 +22,7 @@ import { Suspect } from '../../models';
             class="w-full h-full object-cover"
           />
         } @else {
-          <svg
-            class="w-16 h-16 opacity-20"
-            viewBox="0 0 24 24"
-            fill="currentColor"
-            aria-hidden="true"
-          >
-            <path
-              d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"
-            />
-          </svg>
+          <span class="material-icons mi-2xl opacity-20">person</span>
         }
       </div>
 
@@ -44,7 +35,10 @@ import { Suspect } from '../../models';
           {{ suspect().description }}
         </p>
         @if (isInterviewed()) {
-          <span class="text-xs text-green-400 opacity-80 mt-1">✓ Interviewed</span>
+          <span class="text-xs text-green-400 opacity-80 mt-1 flex items-center gap-1">
+            <span class="material-icons mi-sm">check_circle</span>
+            Interviewed
+          </span>
         }
       </div>
     </button>
