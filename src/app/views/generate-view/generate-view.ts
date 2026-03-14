@@ -16,7 +16,7 @@ type Difficulty = 'easy' | 'normal' | 'hard' | 'genius';
   imports: [LoadingScreenComponent],
   template: `
     @if (!error()) {
-      <app-loading-screen [message]="loadingMessage()" />
+      <app-loading-screen [steps]="llm.generationSteps()" />
     } @else {
       <div
         class="min-h-screen bg-(--color-primary) flex flex-col items-center justify-center gap-6 px-6"
@@ -45,13 +45,12 @@ type Difficulty = 'easy' | 'normal' | 'hard' | 'genius';
 })
 export class GenerateView implements OnInit {
   private readonly router = inject(Router);
-  private readonly llm = inject(LlmService);
+  readonly llm = inject(LlmService);
   private readonly imageService = inject(ImageService);
   private readonly gameState = inject(GameStateService);
   private readonly caseStore = inject(CaseStoreService);
   private readonly theme = inject(ThemeService);
 
-  readonly loadingMessage = signal('Crafting your case...');
   readonly error = signal('');
 
   private difficulty: Difficulty = 'normal';
@@ -67,15 +66,12 @@ export class GenerateView implements OnInit {
 
   generate(): void {
     this.error.set('');
-    this.loadingMessage.set('Crafting your case...');
 
     this.llm.generateCasePackage(this.difficulty, this.style).subscribe({
       next: (pkg: CasePackage) => {
-        this.loadingMessage.set('Applying the theme...');
         this.theme.applyTheme(pkg.uiTheme);
         this.theme.applyTexture(pkg.uiTheme.textureFamily);
 
-        this.loadingMessage.set('Saving case files...');
         this.caseStore.storeCase(pkg).subscribe(() => {
           this.gameState.initState(pkg.id);
 

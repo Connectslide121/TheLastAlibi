@@ -21,7 +21,7 @@ export class ImageService {
       'x-goog-api-key': environment.geminiApiKey,
     });
 
-    // Imagen 4 Fast via Gemini Developer API
+    // Imagen 4 via Gemini Developer API (stable GA)
     const body = {
       instances: [{ prompt }],
       parameters: { sampleCount: 1 },
