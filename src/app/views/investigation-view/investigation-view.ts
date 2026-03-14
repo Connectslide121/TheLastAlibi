@@ -83,7 +83,9 @@ import {
           style="border-right: var(--border-style); min-height: calc(100vh - 3.5rem);"
         >
           <!-- Act Progress -->
-          <div class="font-mono text-xs text-(--color-text-muted) uppercase tracking-widest flex items-center gap-1.5">
+          <div
+            class="font-mono text-xs text-(--color-text-muted) uppercase tracking-widest flex items-center gap-1.5"
+          >
             <span class="material-icons mi-sm">timeline</span>
             Act {{ gameState()?.currentAct ?? 1 }} Progress
           </div>
@@ -95,7 +97,9 @@ import {
           </div>
 
           <!-- Suspects -->
-          <div class="font-mono text-xs text-(--color-text-muted) uppercase tracking-widest mt-2 flex items-center gap-1.5">
+          <div
+            class="font-mono text-xs text-(--color-text-muted) uppercase tracking-widest mt-2 flex items-center gap-1.5"
+          >
             <span class="material-icons mi-sm">people</span>
             Suspects ({{ unlockedSuspects().length }})
           </div>
@@ -119,7 +123,7 @@ import {
             style="border-color: var(--color-accent); color: var(--color-accent);"
           >
             <span class="material-icons mi-sm">lightbulb</span>
-          Use Hint ({{ hintsRemaining() }} left)
+            Use Hint ({{ hintsRemaining() }} left)
           </button>
         </aside>
 
@@ -168,7 +172,7 @@ import {
                     class="font-mono text-xs uppercase text-(--color-text-muted) tracking-widest mb-3"
                   >
                     <span class="material-icons mi-sm">article</span>
-                  Evidence Found
+                    Evidence Found
                   </h3>
                   <div class="flex flex-col gap-3">
                     @for (clue of recentClues(); track clue.id) {
@@ -184,7 +188,7 @@ import {
                 style="border-color: var(--color-accent); color: var(--color-accent);"
               >
                 <span class="material-icons mi-sm">arrow_forward</span>
-              Continue
+                Continue
               </button>
             </div>
           } @else {
@@ -206,7 +210,9 @@ import {
                   style="background: var(--color-secondary); border-color: rgba(201,168,76,0.3);"
                 >
                   <div class="flex items-start gap-3">
-                    <span class="material-icons mi-lg text-(--color-accent) opacity-70">{{ categoryIcon(event.category) }}</span>
+                    <span class="material-icons mi-lg text-(--color-accent) opacity-70">{{
+                      categoryIcon(event.category)
+                    }}</span>
                     <div class="flex-1">
                       <h3 class="font-heading text-(--color-accent) mb-0.5">{{ event.title }}</h3>
                       <p class="text-sm text-(--color-text) opacity-80">{{ event.description }}</p>
@@ -247,7 +253,9 @@ import {
           class="w-56 shrink-0 flex flex-col gap-3 p-4 overflow-y-auto"
           style="border-left: var(--border-style); min-height: calc(100vh - 3.5rem);"
         >
-          <div class="font-mono text-xs text-(--color-text-muted) uppercase tracking-widest flex items-center gap-1.5">
+          <div
+            class="font-mono text-xs text-(--color-text-muted) uppercase tracking-widest flex items-center gap-1.5"
+          >
             <span class="material-icons mi-sm">inventory_2</span>
             Evidence ({{ foundClues().length }})
           </div>

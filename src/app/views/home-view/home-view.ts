@@ -103,7 +103,9 @@ const ART_STYLES = [
       <!-- Saved Cases -->
       @if (savedCases().length > 0) {
         <div class="w-full max-w-xl flex flex-col gap-3">
-          <h2 class="font-mono text-xs uppercase tracking-widest text-(--color-text-muted) text-center flex items-center justify-center gap-1.5">
+          <h2
+            class="font-mono text-xs uppercase tracking-widest text-(--color-text-muted) text-center flex items-center justify-center gap-1.5"
+          >
             <span class="material-icons mi-sm">folder_open</span>
             Saved Investigations
           </h2>
@@ -162,8 +164,8 @@ const ART_STYLES = [
               Delete this case?
             </h3>
             <p class="text-sm text-(--color-text) opacity-80">
-              "<strong>{{ pendingDelete()!.title }}</strong>" will be permanently deleted.
-              This cannot be undone.
+              "<strong>{{ pendingDelete()!.title }}</strong
+              >" will be permanently deleted. This cannot be undone.
             </p>
             <div class="flex gap-3">
               <button

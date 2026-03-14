@@ -38,19 +38,14 @@ export class LlmService {
       'x-goog-api-key': environment.geminiApiKey,
     });
 
+    const systemPrefix =
+      'You are a master crime-fiction writer and game designer. Your only output is raw, valid JSON — no markdown fences, no prose, no explanation. Every ID field must be a unique kebab-case string. All cross-referenced IDs must exist in their respective arrays.\n\n';
+
     const body = {
-      systemInstruction: {
-        parts: [
-          {
-            text: 'You are a master crime-fiction writer and game designer. Your only output is raw, valid JSON — no markdown fences, no prose, no explanation. Every ID field must be a unique kebab-case string. All cross-referenced IDs must exist in their respective arrays.',
-          },
-        ],
-      },
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      contents: [{ role: 'user', parts: [{ text: systemPrefix + prompt }] }],
       generationConfig: {
         temperature: 0.9,
         maxOutputTokens: 8192,
-        responseMimeType: 'application/json',
       },
     };
 

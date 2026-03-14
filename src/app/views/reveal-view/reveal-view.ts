@@ -35,13 +35,14 @@ import { CasePackage, Suspect, Clue } from '../../models';
             <span
               class="material-icons text-5xl"
               [style.color]="isCorrect() ? 'rgb(134,239,172)' : 'rgb(252,165,165)'"
-            >{{ isCorrect() ? 'emoji_events' : 'error' }}</span>
+              >{{ isCorrect() ? 'emoji_events' : 'error' }}</span
+            >
             <h1
-            class="font-heading text-4xl"
-            [style.color]="isCorrect() ? 'rgb(134,239,172)' : 'rgb(252,165,165)'"
-          >
-            {{ isCorrect() ? 'Brilliant Deduction!' : 'Not Quite…' }}
-          </h1>
+              class="font-heading text-4xl"
+              [style.color]="isCorrect() ? 'rgb(134,239,172)' : 'rgb(252,165,165)'"
+            >
+              {{ isCorrect() ? 'Brilliant Deduction!' : 'Not Quite…' }}
+            </h1>
           </div>
           <p class="text-(--color-text) max-w-lg mx-auto">
             @if (isCorrect()) {
@@ -56,28 +57,37 @@ import { CasePackage, Suspect, Clue } from '../../models';
           <div class="flex items-center justify-center gap-6 mt-6">
             <div class="flex flex-col items-center gap-1">
               <div class="flex items-center gap-1">
-                <span class="material-icons mi-sm opacity-60" [style.color]="grade().colour">military_tech</span>
+                <span class="material-icons mi-sm opacity-60" [style.color]="grade().colour"
+                  >military_tech</span
+                >
                 <span
                   class="font-heading text-6xl font-bold leading-none"
                   [style.color]="grade().colour"
-                >{{ grade().letter }}</span>
+                  >{{ grade().letter }}</span
+                >
               </div>
-              <span class="font-mono text-xs uppercase tracking-widest opacity-60" [style.color]="grade().colour">
+              <span
+                class="font-mono text-xs uppercase tracking-widest opacity-60"
+                [style.color]="grade().colour"
+              >
                 {{ grade().label }}
               </span>
             </div>
-            <div
-              class="w-px h-12 opacity-20"
-              style="background: currentColor;"
-            ></div>
+            <div class="w-px h-12 opacity-20" style="background: currentColor;"></div>
             <div class="flex flex-col items-center gap-1">
-              <span class="font-heading text-4xl font-bold text-(--color-accent)">{{ score() }}</span>
-              <span class="font-mono text-xs uppercase tracking-widest text-(--color-text-muted)">points</span>
+              <span class="font-heading text-4xl font-bold text-(--color-accent)">{{
+                score()
+              }}</span>
+              <span class="font-mono text-xs uppercase tracking-widest text-(--color-text-muted)"
+                >points</span
+              >
             </div>
           </div>
 
           <!-- Score breakdown -->
-          <div class="mt-3 font-mono text-xs text-(--color-text-muted) flex flex-wrap gap-x-5 gap-y-1 justify-center">
+          <div
+            class="mt-3 font-mono text-xs text-(--color-text-muted) flex flex-wrap gap-x-5 gap-y-1 justify-center"
+          >
             <span>Base: 1000</span>
             @if (gameState()?.hintsUsed) {
               <span>Hints: −{{ (gameState()?.hintsUsed ?? 0) * 50 }}</span>
@@ -86,7 +96,11 @@ import { CasePackage, Suspect, Clue } from '../../models';
               <span>Wrong accusation: −100</span>
             }
             @if ((gameState()?.interviewedSuspectIds?.length ?? 0) > 1) {
-              <span>Extra interviews: −{{ ((gameState()?.interviewedSuspectIds?.length ?? 1) - 1) * 10 }}</span>
+              <span
+                >Extra interviews: −{{
+                  ((gameState()?.interviewedSuspectIds?.length ?? 1) - 1) * 10
+                }}</span
+              >
             }
           </div>
         </div>
@@ -140,16 +154,18 @@ import { CasePackage, Suspect, Clue } from '../../models';
         @if (casePackage()?.solutionExplanation?.stepsExplained?.length) {
           <section class="px-6 pb-6 max-w-3xl mx-auto w-full">
             <h2 class="font-heading text-xl text-(--color-accent) mb-4 flex items-center gap-2">
-            <span class="material-icons mi-lg">format_list_numbered</span>
-            Step by Step
-          </h2>
+              <span class="material-icons mi-lg">format_list_numbered</span>
+              Step by Step
+            </h2>
             <div class="flex flex-col gap-3">
               @for (step of visibleSteps(); track $index) {
                 <div
                   class="flex gap-3 p-4 rounded-lg"
                   style="background: var(--color-secondary); border: var(--border-style);"
                 >
-                  <span class="material-icons mi-sm text-(--color-accent) shrink-0 mt-0.5">check_circle</span>
+                  <span class="material-icons mi-sm text-(--color-accent) shrink-0 mt-0.5"
+                    >check_circle</span
+                  >
                   <p class="text-sm text-(--color-text)">{{ step }}</p>
                 </div>
               }
@@ -174,9 +190,9 @@ import { CasePackage, Suspect, Clue } from '../../models';
         ) {
           <section class="px-6 pb-6 max-w-3xl mx-auto w-full">
             <h2 class="font-heading text-xl text-(--color-accent) mb-3 flex items-center gap-2">
-            <span class="material-icons mi-lg">warning</span>
-            About the Red Herrings
-          </h2>
+              <span class="material-icons mi-lg">warning</span>
+              About the Red Herrings
+            </h2>
             <div class="flex flex-col gap-2">
               @for (
                 exp of casePackage()!.solutionExplanation.redHerringExplanations;
@@ -210,18 +226,18 @@ import { CasePackage, Suspect, Clue } from '../../models';
         @if (currentStep() >= totalSteps() - 1) {
           <section class="px-6 pb-6 max-w-3xl mx-auto w-full">
             <h2 class="font-heading text-xl text-(--color-accent) mb-4 flex items-center gap-2">
-            <span class="material-icons mi-lg">timeline</span>
-            The Real Timeline
-          </h2>
+              <span class="material-icons mi-lg">timeline</span>
+              The Real Timeline
+            </h2>
             <app-timeline [events]="casePackage()!.timeline" [revealTruth]="true" />
           </section>
 
           <!-- All Clues with Truth -->
           <section class="px-6 pb-6 max-w-3xl mx-auto w-full">
             <h2 class="font-heading text-xl text-(--color-accent) mb-4 flex items-center gap-2">
-            <span class="material-icons mi-lg">article</span>
-            All Evidence Reviewed
-          </h2>
+              <span class="material-icons mi-lg">article</span>
+              All Evidence Reviewed
+            </h2>
             <div class="flex flex-col gap-3">
               @for (clue of allClues(); track clue.id) {
                 <app-clue-card [clue]="clue" [showTruth]="true" />
@@ -314,10 +330,7 @@ export class RevealView implements OnInit {
 
     // Bonus 200 if all red-herring clues were found
     const redHerringIds = pkg.truth.redHerringClueIds;
-    if (
-      redHerringIds.length > 0 &&
-      redHerringIds.every((id) => state.foundClueIds.includes(id))
-    ) {
+    if (redHerringIds.length > 0 && redHerringIds.every((id) => state.foundClueIds.includes(id))) {
       points += 200;
     }
 

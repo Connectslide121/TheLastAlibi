@@ -34,10 +34,10 @@ type Difficulty = 'easy' | 'normal' | 'hard' | 'genius';
         <button
           type="button"
           (click)="goHome()"
-          class="text-(--color-text) text-sm opacity-50 hover:opacity-80 cursor-pointer underline flex items-center gap-1"
+          class="text-(--color-text) text-sm opacity-50 hover:opacity-80 cursor-pointer group flex items-center gap-1"
         >
           <span class="material-icons mi-sm">home</span>
-          Back to Home
+          <span class="group-hover:underline"> Back to Home</span>
         </button>
       </div>
     }

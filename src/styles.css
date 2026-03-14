@@ -209,18 +209,28 @@ app-reveal-view {
 }
 
 /* Staggered animation delay helpers */
-.anim-delay-1 { animation-delay: 0.05s; }
-.anim-delay-2 { animation-delay: 0.10s; }
-.anim-delay-3 { animation-delay: 0.15s; }
-.anim-delay-4 { animation-delay: 0.20s; }
-.anim-delay-5 { animation-delay: 0.25s; }
+.anim-delay-1 {
+  animation-delay: 0.05s;
+}
+.anim-delay-2 {
+  animation-delay: 0.1s;
+}
+.anim-delay-3 {
+  animation-delay: 0.15s;
+}
+.anim-delay-4 {
+  animation-delay: 0.2s;
+}
+.anim-delay-5 {
+  animation-delay: 0.25s;
+}
 
 /* ============================================================
    MATERIAL ICONS — sizing & colour helpers
    ============================================================ */
 .material-icons {
   font-size: 20px;
-  line-height: 1;
+  line-height: 1.2;
   user-select: none;
   vertical-align: middle;
   display: inline-flex;
@@ -228,9 +238,18 @@ app-reveal-view {
 }
 
 /* Size variants */
-.mi-sm  { font-size: 16px; }
-.mi-md  { font-size: 20px; }
-.mi-lg  { font-size: 24px; }
-.mi-xl  { font-size: 32px; }
-.mi-2xl { font-size: 48px; }
-
+.mi-sm {
+  font-size: 16px;
+}
+.mi-md {
+  font-size: 20px;
+}
+.mi-lg {
+  font-size: 24px;
+}
+.mi-xl {
+  font-size: 32px;
+}
+.mi-2xl {
+  font-size: 48px;
+}

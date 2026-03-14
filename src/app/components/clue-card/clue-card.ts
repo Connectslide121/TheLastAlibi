@@ -28,7 +28,9 @@ import { Clue } from '../../models';
         </span>
       }
 
-      <h3 class="text-(--color-accent) font-serif font-bold text-base leading-tight flex items-center gap-2">
+      <h3
+        class="text-(--color-accent) font-serif font-bold text-base leading-tight flex items-center gap-2"
+      >
         <span class="material-icons mi-sm opacity-70">search</span>
         {{ clue().name }}
       </h3>

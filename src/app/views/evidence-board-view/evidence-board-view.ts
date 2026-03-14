@@ -186,7 +186,9 @@ const CARD_H = 130; // approx card height for midpoint calc
                 class="absolute -top-2 -right-2 w-5 h-5 rounded-full flex items-center justify-center text-white shadow-md bg-red-600"
                 title="Contradiction found"
               >
-                <span class="material-icons" style="font-size: 12px; line-height: 1;">priority_high</span>
+                <span class="material-icons" style="font-size: 12px; line-height: 1;"
+                  >priority_high</span
+                >
               </div>
             }
             @if (card.imageUrl) {
@@ -200,7 +202,9 @@ const CARD_H = 130; // approx card height for midpoint calc
                 class="w-full h-12 rounded-t-lg flex items-center justify-center opacity-30"
                 style="background: var(--color-surface);"
               >
-                <span class="material-icons mi-xl text-(--color-text-muted)">{{ card.type === 'suspect' ? 'person' : 'search' }}</span>
+                <span class="material-icons mi-xl text-(--color-text-muted)">{{
+                  card.type === 'suspect' ? 'person' : 'search'
+                }}</span>
               </div>
             }
             <div class="p-2">

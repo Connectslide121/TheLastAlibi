@@ -24,7 +24,9 @@ import { PuzzleEvent, Clue } from '../../models';
           [class.blur-sm]="!solved()"
           [class.opacity-50]="!solved()"
         >
-          <span class="material-icons mi-lg text-(--color-accent)">{{ solved() ? 'manage_search' : 'lock' }}</span>
+          <span class="material-icons mi-lg text-(--color-accent)">{{
+            solved() ? 'manage_search' : 'lock'
+          }}</span>
           <div class="flex-1 min-w-0">
             <p class="font-heading text-sm text-(--color-accent) truncate">
               {{ solved() ? rewardClue()!.name : 'Reward Clue — Solve to unlock' }}

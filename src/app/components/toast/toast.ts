@@ -34,7 +34,13 @@ import { ToastService } from './toast.service';
           [class.toast-warning]="toast.type === 'warning'"
         >
           <span class="material-icons mi-sm shrink-0 opacity-70">
-            {{ toast.type === 'success' ? 'check_circle' : toast.type === 'warning' ? 'warning' : 'info' }}
+            {{
+              toast.type === 'success'
+                ? 'check_circle'
+                : toast.type === 'warning'
+                  ? 'warning'
+                  : 'info'
+            }}
           </span>
           <span class="flex-1">{{ toast.message }}</span>
           <button
