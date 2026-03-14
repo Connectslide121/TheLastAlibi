@@ -4,8 +4,8 @@ import { Component } from '@angular/core';
   selector: 'app-accusation-view',
   standalone: true,
   template: `
-    <div class="flex items-center justify-center h-screen bg-[var(--color-primary)]">
-      <p class="text-[var(--color-text)]">Make your accusation</p>
+    <div class="flex items-center justify-center h-screen bg-(--color-primary)">
+      <p class="text-(--color-text)">Make your accusation</p>
     </div>
   `,
 })

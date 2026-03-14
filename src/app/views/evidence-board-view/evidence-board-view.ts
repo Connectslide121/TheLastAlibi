@@ -4,8 +4,8 @@ import { Component } from '@angular/core';
   selector: 'app-evidence-board-view',
   standalone: true,
   template: `
-    <div class="flex items-center justify-center h-screen bg-[var(--color-primary)]">
-      <p class="text-[var(--color-text)]">Evidence Board</p>
+    <div class="flex items-center justify-center h-screen bg-(--color-primary)">
+      <p class="text-(--color-text)">Evidence Board</p>
     </div>
   `,
 })
