@@ -51,8 +51,8 @@
 > All game data is defined as TypeScript interfaces before any logic is written. This is the single source of truth for the entire application.
 
 ### 1.1 Core Case Package Model
-- [ ] Create `src/app/models/case-package.model.ts`
-- [ ] Define `CasePackage` interface with fields:
+- [x] Create `src/app/models/case-package.model.ts`
+- [x] Define `CasePackage` interface with fields:
   - `id: string` — unique session ID (UUID)
   - `metadata: CaseMetadata`
   - `truth: TruthLayer`
@@ -70,7 +70,7 @@
   - `generatedAt: string` — ISO timestamp
 
 ### 1.2 Case Metadata Model
-- [ ] Create `CaseMetadata` interface:
+- [x] Create `CaseMetadata` interface:
   - `title: string`
   - `subtitle: string`
   - `caseType: 'murder' | 'theft' | 'disappearance' | 'sabotage' | 'other'`
@@ -82,7 +82,7 @@
   - `act3Summary: string`
 
 ### 1.3 Truth Layer Model
-- [ ] Create `TruthLayer` interface:
+- [x] Create `TruthLayer` interface:
   - `culpritId: string` — references `Suspect.id`
   - `motive: string`
   - `method: string`
@@ -97,7 +97,7 @@
   - `redHerringClueIds: string[]`
 
 ### 1.4 Suspect Model
-- [ ] Create `Suspect` interface:
+- [x] Create `Suspect` interface:
   - `id: string`
   - `name: string`
   - `age: number`
@@ -115,7 +115,7 @@
   - `imageUrl?: string` — populated after image generation
 
 ### 1.5 Location Model
-- [ ] Create `Location` interface:
+- [x] Create `Location` interface:
   - `id: string`
   - `name: string`
   - `description: string`
@@ -125,7 +125,7 @@
   - `imageUrl?: string`
 
 ### 1.6 Clue Model
-- [ ] Create `Clue` interface:
+- [x] Create `Clue` interface:
   - `id: string`
   - `name: string`
   - `description: string`
@@ -136,7 +136,7 @@
   - `imageUrl?: string`
 
 ### 1.7 Timeline Event Model
-- [ ] Create `TimelineEvent` interface:
+- [x] Create `TimelineEvent` interface:
   - `id: string`
   - `time: string` — e.g. "8:45 PM"
   - `description: string`
@@ -144,7 +144,7 @@
   - `isTrue: boolean` — false = part of the deception
 
 ### 1.8 Investigation Event Graph Model
-- [ ] Create `InvestigationEvent` interface:
+- [x] Create `InvestigationEvent` interface:
   - `id: string`
   - `category: 'investigation' | 'social' | 'surprise' | 'puzzle' | 'deduction'`
   - `type: string` — e.g. "inspect_crime_scene", "suspect_interview"
@@ -161,7 +161,7 @@
   - `isCompleted: boolean` — runtime state (not in generated package)
 
 ### 1.9 Puzzle Event Model
-- [ ] Create `PuzzleEvent` interface:
+- [x] Create `PuzzleEvent` interface:
   - `id: string`
   - `type: 'cipher' | 'lock' | 'pattern' | 'fragment' | 'logic_grid' | 'sequence' | 'map' | 'mechanical'`
   - `title: string`
@@ -172,7 +172,7 @@
   - `hints: string[]`
 
 ### 1.10 Visual Direction Model
-- [ ] Create `VisualDirection` interface:
+- [x] Create `VisualDirection` interface:
   - `artStyle: string` — e.g. "noir illustration", "pixel art"
   - `mood: string`
   - `colorPalette: string[]` — array of hex colors
@@ -182,7 +182,7 @@
   - `negativePrompt: string`
 
 ### 1.11 UI Theme Model
-- [ ] Create `UITheme` interface:
+- [x] Create `UITheme` interface:
   - `primaryColor: string`
   - `secondaryColor: string`
   - `accentColor: string`
@@ -194,7 +194,7 @@
   - `textureFamily: 'paper' | 'grain' | 'cork' | 'metal' | 'leather' | 'fabric' | 'pixel_noise'`
 
 ### 1.12 Image Prompt Templates Model
-- [ ] Create `ImagePromptTemplates` interface:
+- [x] Create `ImagePromptTemplates` interface:
   - `suspectPortrait: string` — template with `{{name}}`, `{{description}}` placeholders
   - `locationScene: string`
   - `clueObject: string`
@@ -202,14 +202,14 @@
   - `puzzleObject: string`
 
 ### 1.13 Dialogue & Hint Models
-- [ ] Create `DialogueLine` interface: `{ speakerId: string, speakerName: string, text: string, revealsTruth: boolean }`
-- [ ] Create `Hint` interface: `{ index: number, text: string, targetsEventId?: string }`
-- [ ] Create `SolutionExplanation` interface: `{ narrative: string, stepsExplained: string[], redHerringExplanations: string[] }`
-- [ ] Create `UnlockCondition` interface: `{ type: 'event_completed' | 'clue_found' | 'act_reached', referenceId: string }`
+- [x] Create `DialogueLine` interface: `{ speakerId: string, speakerName: string, text: string, revealsTruth: boolean }`
+- [x] Create `Hint` interface: `{ index: number, text: string, targetsEventId?: string }`
+- [x] Create `SolutionExplanation` interface: `{ narrative: string, stepsExplained: string[], redHerringExplanations: string[] }`
+- [x] Create `UnlockCondition` interface: `{ type: 'event_completed' | 'clue_found' | 'act_reached', referenceId: string }`
 
 ### 1.14 Game State Model
-- [ ] Create `src/app/models/game-state.model.ts`
-- [ ] Define `GameState` interface:
+- [x] Create `src/app/models/game-state.model.ts`
+- [x] Define `GameState` interface:
   - `sessionId: string`
   - `completedEventIds: string[]`
   - `visitedLocationIds: string[]`
@@ -223,18 +223,18 @@
   - `finalAccusation?: FinalAccusation`
   - `evidenceBoardNotes: EvidenceBoardNote[]`
   - `hintsUsed: number`
-- [ ] Define `FinalAccusation` interface: `{ culpritId: string, motive: string, method: string, evidenceIds: string[] }`
-- [ ] Define `EvidenceBoardNote` interface: `{ id: string, text: string, x: number, y: number, connectedToIds: string[] }`
+- [x] Define `FinalAccusation` interface: `{ culpritId: string, motive: string, method: string, evidenceIds: string[] }`
+- [x] Define `EvidenceBoardNote` interface: `{ id: string, text: string, x: number, y: number, connectedToIds: string[] }`
 
 ---
 
 ## Phase 2 – Core Services
 
 ### 2.1 LLM Service
-- [ ] Create `src/app/services/llm.service.ts`
-- [ ] Implement `generateCasePackage(difficulty, stylePreference): Observable<CasePackage>`
-- [ ] Build the master prompt that instructs the LLM to return a valid JSON `CasePackage`
-- [ ] Implement prompt sections in separate private methods (one per section) for maintainability:
+- [x] Create `src/app/services/llm.service.ts`
+- [x] Implement `generateCasePackage(difficulty, stylePreference): Observable<CasePackage>`
+- [x] Build the master prompt that instructs the LLM to return a valid JSON `CasePackage`
+- [x] Implement prompt sections in separate private methods (one per section) for maintainability:
   - `buildTruthPrompt()`
   - `buildSuspectsPrompt()`
   - `buildLocationsPrompt()`
@@ -243,47 +243,47 @@
   - `buildPuzzlesPrompt()`
   - `buildVisualDirectionPrompt()`
   - `buildUIThemePrompt()`
-- [ ] Implement JSON response parsing with error catching
-- [ ] Implement retry logic (max 2 retries) if JSON parsing fails
-- [ ] Add response validation to ensure required fields are present
+- [x] Implement JSON response parsing with error catching
+- [x] Implement retry logic (max 2 retries) if JSON parsing fails
+- [x] Add response validation to ensure required fields are present
 
 ### 2.2 Image Generation Service
-- [ ] Create `src/app/services/image.service.ts`
-- [ ] Implement `generateImage(prompt: string): Observable<string>` returning a base64 data URL or hosted URL
-- [ ] Implement `generateAllCaseImages(casePackage: CasePackage): Observable<CasePackage>` — batch generates all images and populates `imageUrl` fields
-- [ ] Add placeholder/fallback for when image generation is unavailable (use CSS-generated placeholders)
-- [ ] Implement a queue so that images are generated progressively and do not block gameplay start
+- [x] Create `src/app/services/image.service.ts`
+- [x] Implement `generateImage(prompt: string): Observable<string>` returning a base64 data URL or hosted URL
+- [x] Implement `generateAllCaseImages(casePackage: CasePackage): Observable<CasePackage>` — batch generates all images and populates `imageUrl` fields
+- [x] Add placeholder/fallback for when image generation is unavailable (use CSS-generated placeholders)
+- [x] Implement a queue so that images are generated progressively and do not block gameplay start
 
 ### 2.3 Game State Service
-- [ ] Create `src/app/services/game-state.service.ts`
-- [ ] Implement `initState(sessionId: string): void`
-- [ ] Implement `saveState(state: GameState): void` — persists to `localStorage`
-- [ ] Implement `loadState(sessionId: string): GameState | null`
-- [ ] Implement `clearState(): void`
-- [ ] Implement `getAvailableEvents(casePackage: CasePackage, state: GameState): InvestigationEvent[]` — evaluates unlock conditions
-- [ ] Implement `completeEvent(eventId: string): void`
-- [ ] Implement `discoverClue(clueId: string): void`
-- [ ] Implement `completePuzzle(puzzleId: string): void`
-- [ ] Implement `visitLocation(locationId: string): void`
-- [ ] Implement `interviewSuspect(suspectId: string): void`
-- [ ] Implement `advanceAct(): void` — moves game to next act when conditions are met
-- [ ] Implement `unlockAccusation(): void`
-- [ ] Implement `submitAccusation(accusation: FinalAccusation): boolean` — returns true if correct
+- [x] Create `src/app/services/game-state.service.ts`
+- [x] Implement `initState(sessionId: string): void`
+- [x] Implement `saveState(state: GameState): void` — persists to `localStorage`
+- [x] Implement `loadState(sessionId: string): GameState | null`
+- [x] Implement `clearState(): void`
+- [x] Implement `getAvailableEvents(casePackage: CasePackage, state: GameState): InvestigationEvent[]` — evaluates unlock conditions
+- [x] Implement `completeEvent(eventId: string): void`
+- [x] Implement `discoverClue(clueId: string): void`
+- [x] Implement `completePuzzle(puzzleId: string): void`
+- [x] Implement `visitLocation(locationId: string): void`
+- [x] Implement `interviewSuspect(suspectId: string): void`
+- [x] Implement `advanceAct(): void` — moves game to next act when conditions are met
+- [x] Implement `unlockAccusation(): void`
+- [x] Implement `submitAccusation(accusation: FinalAccusation): boolean` — returns true if correct
 
 ### 2.4 Case Store Service
-- [ ] Create `src/app/services/case-store.service.ts`
-- [ ] Implement `storeCase(casePackage: CasePackage): void` — saves to `localStorage` or `IndexedDB`
-- [ ] Implement `loadCase(sessionId: string): CasePackage | null`
-- [ ] Implement `deleteCase(sessionId: string): void`
-- [ ] Implement `listSavedCases(): { id: string, title: string, savedAt: string }[]`
-- [ ] Use `IndexedDB` via a thin wrapper for large case packages (avoid localStorage size limits)
+- [x] Create `src/app/services/case-store.service.ts`
+- [x] Implement `storeCase(casePackage: CasePackage): void` — saves to `localStorage` or `IndexedDB`
+- [x] Implement `loadCase(sessionId: string): CasePackage | null`
+- [x] Implement `deleteCase(sessionId: string): void`
+- [x] Implement `listSavedCases(): { id: string, title: string, savedAt: string }[]`
+- [x] Use `IndexedDB` via a thin wrapper for large case packages (avoid localStorage size limits)
 
 ### 2.5 Theme Service
-- [ ] Create `src/app/services/theme.service.ts`
-- [ ] Implement `applyTheme(theme: UITheme): void` — injects CSS variables onto `:root`
-- [ ] Define CSS variable names: `--color-primary`, `--color-secondary`, `--color-accent`, `--color-surface`, `--color-text`, `--border-style`, `--shadow-style`
-- [ ] Implement `applyTexture(textureFamily: UITheme['textureFamily']): void` — sets body data-attribute mapped to CSS texture class
-- [ ] Implement `resetTheme(): void`
+- [x] Create `src/app/services/theme.service.ts`
+- [x] Implement `applyTheme(theme: UITheme): void` — injects CSS variables onto `:root`
+- [x] Define CSS variable names: `--color-primary`, `--color-secondary`, `--color-accent`, `--color-surface`, `--color-text`, `--border-style`, `--shadow-style`
+- [x] Implement `applyTexture(textureFamily: UITheme['textureFamily']): void` — sets body data-attribute mapped to CSS texture class
+- [x] Implement `resetTheme(): void`
 
 ---
 
@@ -624,4 +624,4 @@
 
 ---
 
-*Last updated: Phase 0 — Complete ✓ (Phase 1 next)*
+*Last updated: Phase 2 — Complete ✓ (Phase 3 next)*
