@@ -350,71 +350,71 @@
 ## Phase 4 – Views / Screens
 
 ### 4.1 Home View
-- [ ] Create `src/app/views/home-view/`
-- [ ] Show game title "The Last Alibi" with styled header
-- [ ] "New Case" button — navigates to Generate View
-- [ ] "Continue" button — visible only if a saved session exists in storage; loads existing case
-- [ ] Difficulty selector: Easy / Normal / Hard / Genius
-- [ ] Visual style selector: dropdown with art styles OR "Surprise Me" option
-- [ ] Brief tagline/description of the game
+- [x] Create `src/app/views/home-view/`
+- [x] Show game title "The Last Alibi" with styled header
+- [x] "New Case" button — navigates to Generate View
+- [x] "Continue" button — visible only if a saved session exists in storage; loads existing case
+- [x] Difficulty selector: Easy / Normal / Hard / Genius
+- [x] Visual style selector: dropdown with art styles OR "Surprise Me" option
+- [x] Brief tagline/description of the game
 
 ### 4.2 Generate View
-- [ ] Create `src/app/views/generate-view/`
-- [ ] Show loading screen with rotating flavor messages while LLM generates the case package
-- [ ] Call `LLMService.generateCasePackage()` on component init
-- [ ] Store generated package via `CaseStoreService`
-- [ ] Initialize game state via `GameStateService`
-- [ ] Apply session theme via `ThemeService`
-- [ ] Kick off background image generation via `ImageService`
-- [ ] Navigate to `/investigation` on completion
-- [ ] Display error state with retry option if generation fails
+- [x] Create `src/app/views/generate-view/`
+- [x] Show loading screen with rotating flavor messages while LLM generates the case package
+- [x] Call `LLMService.generateCasePackage()` on component init
+- [x] Store generated package via `CaseStoreService`
+- [x] Initialize game state via `GameStateService`
+- [x] Apply session theme via `ThemeService`
+- [x] Kick off background image generation via `ImageService`
+- [x] Navigate to `/investigation` on completion
+- [x] Display error state with retry option if generation fails
 
 ### 4.3 Investigation View (Main Gameplay)
-- [ ] Create `src/app/views/investigation-view/`
-- [ ] Layout: left sidebar + main content area + right panel (responsive)
-- [ ] **Left sidebar:** Active suspects list (unlocked), hint button, act progress indicator
-- [ ] **Main content area:** Current scene/event, dialogue, puzzle, or clue display
-- [ ] **Right panel:** Evidence board preview (click to expand), discovered clues counter
-- [ ] **Top bar:** Case title, current act, actions counter, settings icon
-- [ ] Load case package and game state on init
-- [ ] Apply case theme on init via `ThemeService`
-- [ ] Render initially available events from the event graph
-- [ ] Handle event selection and route to appropriate sub-component (dialogue, puzzle, investigation)
-- [ ] Show act transition banner when act advances
-- [ ] Show "Make Accusation" button when accusation is unlocked
-- [ ] Navigate to `/accusation` when accusation button is clicked
+- [x] Create `src/app/views/investigation-view/`
+- [x] Layout: left sidebar + main content area + right panel (responsive)
+- [x] **Left sidebar:** Active suspects list (unlocked), hint button, act progress indicator
+- [x] **Main content area:** Current scene/event, dialogue, puzzle, or clue display
+- [x] **Right panel:** Evidence board preview (click to expand), discovered clues counter
+- [x] **Top bar:** Case title, current act, actions counter, settings icon
+- [x] Load case package and game state on init
+- [x] Apply case theme on init via `ThemeService`
+- [x] Render initially available events from the event graph
+- [x] Handle event selection and route to appropriate sub-component (dialogue, puzzle, investigation)
+- [x] Show act transition banner when act advances
+- [x] Show "Make Accusation" button when accusation is unlocked
+- [x] Navigate to `/accusation` when accusation button is clicked
 
 ### 4.4 Evidence Board View
-- [ ] Create `src/app/views/evidence-board-view/`  
-- [ ] Render a corkboard-style canvas with positioned cards
-- [ ] Display `Suspect` cards pinned to the board
-- [ ] Display found `Clue` cards pinned to the board
-- [ ] Allow drawing connections between cards (click source → click target draws a line)
-- [ ] Allow adding text sticky notes anywhere on the board
-- [ ] Allow dragging cards to reposition them
-- [ ] Persist board layout in `GameState.evidenceBoardNotes`
-- [ ] "Back to Investigation" button
+- [x] Create `src/app/views/evidence-board-view/`  
+- [x] Render a corkboard-style canvas with positioned cards
+- [x] Display `Suspect` cards pinned to the board
+- [x] Display found `Clue` cards pinned to the board
+- [x] Allow drawing connections between cards (click source → click target draws a line)
+- [x] Allow adding text sticky notes anywhere on the board
+- [x] Allow dragging cards to reposition them
+- [x] Persist board layout in `GameState.evidenceBoardNotes`
+- [x] "Back to Investigation" button
 
 ### 4.5 Accusation View
-- [ ] Create `src/app/views/accusation-view/`
-- [ ] Form fields:
+- [x] Create `src/app/views/accusation-view/`
+- [x] Form fields:
   - Suspect selector (dropdown of unlocked suspects with portraits)
   - Motive text area (player writes their interpretation)
   - Method text area (player describes how it was done)
   - Evidence multi-select (player selects supporting clues from found clues)
-- [ ] "Submit Theory" button — calls `GameStateService.submitAccusation()`
-- [ ] Show brief confirmation prompt before finalizing
-- [ ] Navigate to `/reveal` after submission
+- [x] "Submit Theory" button — calls `GameStateService.submitAccusation()`
+- [x] Show brief confirmation prompt before finalizing
+- [x] Navigate to `/reveal` after submission
 
 ### 4.6 Reveal View
-- [ ] Create `src/app/views/reveal-view/`
-- [ ] Show whether player's accusation was correct (correct culprit + motive + method)
-- [ ] Animate the reveal of the full `SolutionExplanation.narrative`
-- [ ] Step through `stepsExplained` in sequence with "Next" button
-- [ ] Show `redHerringExplanations` in a separate "About the Red Herrings" section
-- [ ] Re-display timeline now with all events marked true/false
-- [ ] Show all clues with truth status revealed
-- [ ] "Play Again" button — clears state and returns to Home View
+- [x] Create `src/app/views/reveal-view/`
+- [x] Show whether player's accusation was correct (correct culprit + motive + method)
+- [x] Animate the reveal of the full `SolutionExplanation.narrative`
+- [x] Step through `stepsExplained` in sequence with "Next" button
+- [x] Show `redHerringExplanations` in a separate "About the Red Herrings" section
+- [x] Re-display timeline now with all events marked true/false
+- [x] Show all clues with truth status revealed
+- [x] "Play Again" button — clears state and returns to Home View
 
 ---
 
@@ -624,4 +624,4 @@
 
 ---
 
-*Last updated: Phase 3 — Complete ✓ (Phase 4 next)*
+*Last updated: Phase 4 � Complete ? (Phase 5 next)*
