@@ -1,3 +1,81 @@
-/* You can add global styles to this file, and also import other style files */
-
 @import 'tailwindcss';
+
+/* ============================================================
+   CSS CUSTOM PROPERTIES — overridden per session by ThemeService
+   ============================================================ */
+:root {
+  /* Theme colors (defaults — noir dark) */
+  --color-primary: #1a1a2e;
+  --color-secondary: #16213e;
+  --color-accent: #c9a84c;
+  --color-surface: #0f0f23;
+  --color-text: #e8e0d0;
+  --color-text-muted: #9e9e8e;
+
+  /* Typography */
+  --font-heading: 'Playfair Display', Georgia, serif;
+  --font-body: 'Special Elite', 'Courier New', monospace;
+  --font-mono: 'Courier Prime', 'Courier New', monospace;
+
+  /* UI chrome */
+  --border-style: 1px solid rgba(201, 168, 76, 0.3);
+  --shadow-style: 0 4px 24px rgba(0, 0, 0, 0.6);
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+}
+
+/* ============================================================
+   BASE RESET
+   ============================================================ */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background-color: var(--color-primary);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ============================================================
+   TEXTURE OVERLAYS — activated by data-texture on <body>
+   ThemeService sets body[data-texture="paper"] etc.
+   ============================================================ */
+[data-texture]::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0.06;
+  background-repeat: repeat;
+  background-size: 256px 256px;
+}
+
+[data-texture='paper']::before {
+  background-image: url('/assets/textures/paper.png');
+}
+[data-texture='cork']::before {
+  background-image: url('/assets/textures/cork.png');
+}
+[data-texture='grain']::before {
+  background-image: url('/assets/textures/grain.png');
+}
+[data-texture='metal']::before {
+  background-image: url('/assets/textures/metal.png');
+}
+[data-texture='leather']::before {
+  background-image: url('/assets/textures/leather.png');
+}
+[data-texture='fabric']::before {
+  background-image: url('/assets/textures/fabric.png');
+}
