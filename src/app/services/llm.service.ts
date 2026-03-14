@@ -29,10 +29,7 @@ type Difficulty = CaseMetadata['difficulty'];
 export class LlmService {
   private readonly http = inject(HttpClient);
 
-  generateCasePackage(
-    difficulty: Difficulty,
-    stylePreference: string,
-  ): Observable<CasePackage> {
+  generateCasePackage(difficulty: Difficulty, stylePreference: string): Observable<CasePackage> {
     return this.callLlm(this.buildMasterPrompt(difficulty, stylePreference), 0);
   }
 
@@ -43,37 +40,44 @@ export class LlmService {
   private callLlm(prompt: string, attempt: number): Observable<CasePackage> {
     const headers = new HttpHeaders({
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${environment.llmApiKey}`,
+      'x-goog-api-key': environment.geminiApiKey,
     });
 
     const body = {
-      model: 'gpt-4o',
-      messages: [
+      systemInstruction: {
+        parts: [
+          {
+            text: 'You are a creative mystery game writer. Always respond with valid JSON only. No markdown, no code fences, no explanation — raw JSON matching the requested structure exactly.',
+          },
+        ],
+      },
+      contents: [
         {
-          role: 'system',
-          content:
-            'You are a creative mystery game writer. Always respond with valid JSON only. No markdown, no code fences, no explanation — raw JSON matching the requested structure exactly.',
+          role: 'user',
+          parts: [{ text: prompt }],
         },
-        { role: 'user', content: prompt },
       ],
-      temperature: 0.9,
-      max_tokens: 16000,
+      generationConfig: {
+        temperature: 0.9,
+        maxOutputTokens: 8192,
+        responseMimeType: 'application/json',
+      },
     };
 
-    return this.http.post<{ choices: { message: { content: string } }[] }>(
-      environment.llmApiEndpoint,
-      body,
-      { headers },
-    ).pipe(
+    type GeminiResponse = { candidates: { content: { parts: { text: string }[] } }[] };
+
+    return this.http.post<GeminiResponse>(environment.llmApiEndpoint, body, { headers }).pipe(
       map((response) => {
-        const raw = response.choices[0].message.content.trim();
+        const raw = response.candidates[0].content.parts[0].text.trim();
         return this.parseAndValidate(raw);
       }),
       catchError((err) => {
         if (attempt < 2) {
           return this.callLlm(prompt, attempt + 1);
         }
-        return throwError(() => new Error(`LLM generation failed after ${attempt + 1} attempts: ${err.message}`));
+        return throwError(
+          () => new Error(`LLM generation failed after ${attempt + 1} attempts: ${err.message}`),
+        );
       }),
     );
   }

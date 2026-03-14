@@ -1,7 +1,10 @@
 export const environment = {
   production: true,
-  llmApiKey: '',
-  llmApiEndpoint: 'https://api.openai.com/v1/chat/completions',
-  imageApiKey: '',
-  imageApiEndpoint: 'https://api.openai.com/v1/images/generations',
+  geminiApiKey: 'AIzaSyCROfouhxr1Wja-yuiadKpf989Eekg7Hic',
+  // Gemma 3 27B via Gemini Developer API
+  llmApiEndpoint:
+    'https://generativelanguage.googleapis.com/v1beta/models/gemma-3-27b-it:generateContent',
+  // Imagen 4 Fast via Gemini Developer API
+  imageApiEndpoint:
+    'https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-fast-generate-preview-05-20:predict',
 };

@@ -53,9 +53,7 @@ export class CaseStoreService {
   deleteCase(sessionId: string): Observable<void> {
     return from(
       this.dbPromise.then((db) =>
-        this.runTransaction(db, 'readwrite', (store) =>
-          store.delete(sessionId),
-        ),
+        this.runTransaction(db, 'readwrite', (store) => store.delete(sessionId)),
       ),
     ).pipe(
       map(() => void 0),

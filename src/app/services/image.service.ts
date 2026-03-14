@@ -10,44 +10,32 @@ import { CasePackage, Suspect, Location, Clue } from '../models';
 export class ImageService {
   private readonly http = inject(HttpClient);
 
-  /** Generate a single image and return a base64 data URL or a hosted URL. */
+  /** Generate a single image and return a base64 data URL. */
   generateImage(prompt: string): Observable<string> {
-    if (!environment.imageApiKey) {
+    if (!environment.geminiApiKey) {
       return of(this.buildCssPlaceholder(prompt));
     }
 
     const headers = new HttpHeaders({
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${environment.imageApiKey}`,
+      'x-goog-api-key': environment.geminiApiKey,
     });
 
+    // Imagen 4 Fast via Gemini Developer API
     const body = {
-      model: 'dall-e-3',
-      prompt,
-      n: 1,
-      size: '1024x1024',
-      response_format: 'b64_json',
+      instances: [{ prompt }],
+      parameters: { sampleCount: 1 },
     };
 
-    return this.http
-      .post<{ data: { b64_json?: string; url?: string }[] }>(
-        environment.imageApiEndpoint,
-        body,
-        { headers },
-      )
-      .pipe(
-        map((response) => {
-          const item = response.data[0];
-          if (item.b64_json) {
-            return `data:image/png;base64,${item.b64_json}`;
-          }
-          if (item.url) {
-            return item.url;
-          }
-          throw new Error('Image API returned no data');
-        }),
-        catchError(() => of(this.buildCssPlaceholder(prompt))),
-      );
+    type ImagenResponse = { predictions: { bytesBase64Encoded: string; mimeType: string }[] };
+
+    return this.http.post<ImagenResponse>(environment.imageApiEndpoint, body, { headers }).pipe(
+      map((response) => {
+        const prediction = response.predictions[0];
+        return `data:${prediction.mimeType};base64,${prediction.bytesBase64Encoded}`;
+      }),
+      catchError(() => of(this.buildCssPlaceholder(prompt))),
+    );
   }
 
   /**
@@ -56,7 +44,11 @@ export class ImageService {
    * first few are ready. Each call emits an updated CasePackage snapshot.
    */
   generateAllCaseImages(casePackage: CasePackage): Observable<CasePackage> {
-    type Task = { key: string; prompt: string; apply: (pkg: CasePackage, url: string) => CasePackage };
+    type Task = {
+      key: string;
+      prompt: string;
+      apply: (pkg: CasePackage, url: string) => CasePackage;
+    };
 
     const tasks: Task[] = [
       // Suspects
