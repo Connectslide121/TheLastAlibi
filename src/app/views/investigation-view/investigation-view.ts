@@ -58,6 +58,14 @@ import {
         </span>
         <button
           type="button"
+          (click)="caseFileOpen.set(true)"
+          class="px-3 py-1.5 text-xs font-mono uppercase tracking-widest rounded cursor-pointer border border-(--color-accent) text-(--color-accent) hover:opacity-80 transition-opacity flex items-center gap-1"
+        >
+          <span class="material-icons mi-sm">folder_open</span>
+          Case File
+        </button>
+        <button
+          type="button"
           (click)="goToEvidenceBoard()"
           class="px-3 py-1.5 text-xs font-mono uppercase tracking-widest rounded cursor-pointer border border-(--color-accent) text-(--color-accent) hover:opacity-80 transition-opacity"
         >
@@ -324,6 +332,314 @@ import {
           (dismissed)="onActBannerDismissed()"
         />
       }
+
+      <!-- ===== Case File Drawer ===== -->
+      @if (caseFileOpen()) {
+        <!-- Backdrop -->
+        <div class="fixed inset-0 z-60 bg-black/60" (click)="caseFileOpen.set(false)"></div>
+
+        <!-- Drawer panel -->
+        <div
+          class="fixed right-0 top-0 bottom-0 z-70 w-full max-w-lg flex flex-col"
+          style="background: var(--color-secondary); border-left: var(--border-style); animation: drawerIn 0.25s ease both"
+          (click)="$event.stopPropagation()"
+        >
+          <!-- Drawer header -->
+          <div
+            class="flex items-center gap-3 px-5 py-4 shrink-0"
+            style="border-bottom: var(--border-style)"
+          >
+            <span class="material-icons" style="color: var(--color-accent)">folder_open</span>
+            <h2 class="font-heading text-lg flex-1" style="color: var(--color-accent)">
+              Case File
+            </h2>
+            <button
+              type="button"
+              (click)="caseFileOpen.set(false)"
+              class="p-1.5 rounded opacity-50 hover:opacity-100 transition-opacity cursor-pointer"
+              style="color: var(--color-text)"
+            >
+              <span class="material-icons">close</span>
+            </button>
+          </div>
+
+          <!-- Tabs -->
+          <div class="flex shrink-0 px-5 gap-1 pt-3" style="border-bottom: var(--border-style)">
+            @for (tab of caseFileTabs; track tab.id) {
+              <button
+                type="button"
+                (click)="caseFileTab.set(tab.id)"
+                class="flex items-center gap-1.5 px-3 py-2 font-mono text-xs uppercase tracking-widest cursor-pointer transition-all border-b-2 -mb-px"
+                [style.border-bottom-color]="
+                  caseFileTab() === tab.id ? 'var(--color-accent)' : 'transparent'
+                "
+                [style.color]="
+                  caseFileTab() === tab.id ? 'var(--color-accent)' : 'var(--color-text-muted)'
+                "
+              >
+                <span class="material-icons" style="font-size: 0.95rem">{{ tab.icon }}</span>
+                {{ tab.label }}
+              </button>
+            }
+          </div>
+
+          <!-- Tab content -->
+          <div class="flex-1 overflow-y-auto p-5 flex flex-col gap-5">
+            <!-- BRIEFING TAB -->
+            @if (caseFileTab() === 'briefing') {
+              <div class="flex flex-col gap-5">
+                <div class="flex flex-col gap-1">
+                  <span
+                    class="font-mono text-xs uppercase tracking-widest"
+                    style="color: var(--color-text-muted)"
+                    >{{ casePackage()?.metadata?.caseType }}</span
+                  >
+                  <h3 class="font-heading text-2xl" style="color: var(--color-accent)">
+                    {{ casePackage()?.metadata?.title }}
+                  </h3>
+                  @if (casePackage()?.metadata?.subtitle) {
+                    <p class="font-mono text-sm" style="color: var(--color-text-muted)">
+                      {{ casePackage()?.metadata?.subtitle }}
+                    </p>
+                  }
+                </div>
+                <div class="flex items-center gap-2">
+                  <span class="material-icons" style="font-size: 1rem; color: var(--color-accent)"
+                    >location_on</span
+                  >
+                  <span class="font-mono text-sm" style="color: var(--color-text-muted)">
+                    {{ casePackage()?.metadata?.setting }}
+                  </span>
+                </div>
+                <div
+                  class="rounded-lg p-4"
+                  style="background: var(--color-surface); border: var(--border-style)"
+                >
+                  <p
+                    class="font-mono text-xs uppercase tracking-widest mb-3 flex items-center gap-1.5"
+                    style="color: var(--color-accent)"
+                  >
+                    <span class="material-icons" style="font-size: 0.9rem">description</span>
+                    Briefing
+                  </p>
+                  <p
+                    class="text-sm leading-relaxed"
+                    style="font-family: var(--font-body); color: var(--color-text)"
+                  >
+                    {{ casePackage()?.metadata?.briefing }}
+                  </p>
+                </div>
+                <div class="flex flex-col gap-3">
+                  @for (act of briefingActPreviews(); track act.label) {
+                    <div
+                      class="rounded-lg p-4"
+                      style="background: var(--color-surface); border: var(--border-style)"
+                    >
+                      <p
+                        class="font-mono text-xs uppercase tracking-widest mb-1.5"
+                        style="color: var(--color-accent)"
+                      >
+                        {{ act.label }}
+                      </p>
+                      <p
+                        class="text-sm leading-relaxed"
+                        style="font-family: var(--font-body); color: var(--color-text); opacity: 0.8"
+                      >
+                        {{ act.summary }}
+                      </p>
+                    </div>
+                  }
+                </div>
+              </div>
+            }
+
+            <!-- EVIDENCE TAB -->
+            @if (caseFileTab() === 'evidence') {
+              @if (foundClues().length === 0) {
+                <div class="flex flex-col items-center gap-3 py-12 opacity-50">
+                  <span class="material-icons text-5xl" style="color: var(--color-text-muted)"
+                    >search_off</span
+                  >
+                  <p class="font-mono text-sm" style="color: var(--color-text-muted)">
+                    No evidence collected yet.
+                  </p>
+                </div>
+              }
+              @for (clue of foundClues(); track clue.id) {
+                <div
+                  class="rounded-lg p-4 flex flex-col gap-2"
+                  style="background: var(--color-surface); border: var(--border-style)"
+                >
+                  <div class="flex items-start gap-2">
+                    <span
+                      class="material-icons shrink-0 mt-0.5"
+                      style="font-size: 1rem; color: var(--color-accent)"
+                      >article</span
+                    >
+                    <div class="flex flex-col gap-1 flex-1">
+                      <span class="font-heading text-base" style="color: var(--color-accent)">{{
+                        clue.name
+                      }}</span>
+                      <p
+                        class="text-sm leading-relaxed"
+                        style="font-family: var(--font-body); color: var(--color-text)"
+                      >
+                        {{ clue.description }}
+                      </p>
+                      <p class="text-xs italic mt-1" style="color: var(--color-text-muted)">
+                        <span
+                          class="material-icons"
+                          style="font-size: 0.8rem; vertical-align: middle"
+                          >lightbulb</span
+                        >
+                        {{ clue.revealsInfo }}
+                      </p>
+                      <p class="font-mono text-xs mt-1" style="color: var(--color-text-muted)">
+                        Found at: {{ clueLocationName(clue.locationId) }}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              }
+            }
+
+            <!-- SUSPECTS TAB -->
+            @if (caseFileTab() === 'suspects') {
+              @if (unlockedSuspects().length === 0) {
+                <div class="flex flex-col items-center gap-3 py-12 opacity-50">
+                  <span class="material-icons text-5xl" style="color: var(--color-text-muted)"
+                    >person_off</span
+                  >
+                  <p class="font-mono text-sm" style="color: var(--color-text-muted)">
+                    No suspects identified yet.
+                  </p>
+                </div>
+              }
+              @for (suspect of unlockedSuspects(); track suspect.id) {
+                <div
+                  class="rounded-lg p-4 flex flex-col gap-3"
+                  style="background: var(--color-surface); border: var(--border-style)"
+                >
+                  <div class="flex items-start gap-3">
+                    <!-- Portrait placeholder -->
+                    <div
+                      class="w-12 h-12 rounded-full shrink-0 flex items-center justify-center"
+                      style="background: var(--color-secondary); border: var(--border-style)"
+                    >
+                      <span class="material-icons" style="color: var(--color-accent)">person</span>
+                    </div>
+                    <div class="flex flex-col gap-0.5 flex-1">
+                      <div class="flex items-center gap-2 flex-wrap">
+                        <span class="font-heading text-lg" style="color: var(--color-accent)">{{
+                          suspect.name
+                        }}</span>
+                        @if (isInterviewed(suspect.id)) {
+                          <span
+                            class="font-mono text-xs px-2 py-0.5 rounded-full"
+                            style="background: rgba(201,168,76,0.15); color: var(--color-accent); border: 1px solid rgba(201,168,76,0.3)"
+                            >Interviewed</span
+                          >
+                        }
+                      </div>
+                      <p class="font-mono text-xs" style="color: var(--color-text-muted)">
+                        {{ suspect.age }} · {{ suspect.occupation }}
+                      </p>
+                    </div>
+                  </div>
+                  <p
+                    class="text-sm leading-relaxed"
+                    style="font-family: var(--font-body); color: var(--color-text)"
+                  >
+                    {{ suspect.description }}
+                  </p>
+                  <div
+                    class="rounded p-3 flex flex-col gap-1"
+                    style="background: var(--color-secondary)"
+                  >
+                    <span
+                      class="font-mono text-xs uppercase tracking-widest"
+                      style="color: var(--color-text-muted)"
+                      >Relationship</span
+                    >
+                    <p class="text-xs" style="color: var(--color-text)">
+                      {{ suspect.relationship }}
+                    </p>
+                  </div>
+                  @if (isInterviewed(suspect.id)) {
+                    <div
+                      class="rounded p-3 flex flex-col gap-1"
+                      style="background: var(--color-secondary)"
+                    >
+                      <span
+                        class="font-mono text-xs uppercase tracking-widest"
+                        style="color: var(--color-text-muted)"
+                        >Stated Alibi</span
+                      >
+                      <p class="text-xs" style="color: var(--color-text)">{{ suspect.alibi }}</p>
+                    </div>
+                  }
+                </div>
+              }
+            }
+
+            <!-- TIMELINE TAB -->
+            @if (caseFileTab() === 'timeline') {
+              @if ((casePackage()?.timeline ?? []).length === 0) {
+                <div class="flex flex-col items-center gap-3 py-12 opacity-50">
+                  <span class="material-icons text-5xl" style="color: var(--color-text-muted)"
+                    >schedule</span
+                  >
+                  <p class="font-mono text-sm" style="color: var(--color-text-muted)">
+                    Timeline not yet available.
+                  </p>
+                </div>
+              }
+              <div class="flex flex-col gap-0">
+                @for (event of casePackage()?.timeline ?? []; track event.id; let last = $last) {
+                  <div class="flex gap-3">
+                    <!-- Timeline spine -->
+                    <div class="flex flex-col items-center shrink-0">
+                      <div
+                        class="w-3 h-3 rounded-full mt-1 shrink-0"
+                        style="background: var(--color-accent)"
+                      ></div>
+                      @if (!last) {
+                        <div
+                          class="w-px flex-1 my-1"
+                          style="background: rgba(201,168,76,0.25)"
+                        ></div>
+                      }
+                    </div>
+                    <!-- Event content -->
+                    <div class="flex flex-col gap-1 pb-5">
+                      <span class="font-mono text-xs" style="color: var(--color-accent)">{{
+                        event.time
+                      }}</span>
+                      <p
+                        class="text-sm leading-relaxed"
+                        style="font-family: var(--font-body); color: var(--color-text)"
+                      >
+                        {{ event.description }}
+                      </p>
+                    </div>
+                  </div>
+                }
+              </div>
+            }
+          </div>
+        </div>
+      }
+
+      <style>
+        @keyframes drawerIn {
+          from {
+            transform: translateX(100%);
+          }
+          to {
+            transform: translateX(0);
+          }
+        }
+      </style>
     </div>
   `,
 })
@@ -345,6 +661,8 @@ export class InvestigationView implements OnInit {
   readonly recentClueIds = signal<string[]>([]);
   readonly sidebarOpen = signal(true);
   readonly activeHint = signal<Hint | null>(null);
+  readonly caseFileOpen = signal(false);
+  readonly caseFileTab = signal<'briefing' | 'evidence' | 'suspects' | 'timeline'>('briefing');
 
   readonly gameState = this.gsvc.state;
   readonly isAccusationUnlocked = this.gsvc.isAccusationUnlocked;
@@ -414,10 +732,34 @@ export class InvestigationView implements OnInit {
 
   readonly hasMoreHints = computed(() => this.hintsRemaining() > 0);
 
+  readonly caseFileTabs = [
+    { id: 'briefing' as const, label: 'Briefing', icon: 'description' },
+    { id: 'evidence' as const, label: 'Evidence', icon: 'inventory_2' },
+    { id: 'suspects' as const, label: 'Suspects', icon: 'people' },
+    { id: 'timeline' as const, label: 'Timeline', icon: 'schedule' },
+  ];
+
+  readonly briefingActPreviews = computed(() => {
+    const m = this.casePackage()?.metadata;
+    if (!m) return [];
+    return [
+      { label: 'Act I', summary: m.act1Summary },
+      { label: 'Act II', summary: m.act2Summary },
+      { label: 'Act III', summary: m.act3Summary },
+    ];
+  });
+
+  clueLocationName(locationId: string): string {
+    return this.casePackage()?.locations.find((l) => l.id === locationId)?.name ?? locationId;
+  }
+
   ngOnInit(): void {
-    const nav = this.router.getCurrentNavigation();
-    const navState = nav?.extras?.state as { sessionId?: string } | undefined;
-    const sessionId = navState?.sessionId ?? this.gsvc.state()?.sessionId;
+    // getCurrentNavigation() is only available during the navigation itself.
+    // After navigation completes (e.g. page reload or back-navigation) the
+    // router writes its state into history.state, so we read from there too.
+    const routerState = (this.router.getCurrentNavigation()?.extras?.state ??
+      (window.history.state as Record<string, unknown>)) as { sessionId?: string } | undefined;
+    const sessionId = routerState?.sessionId ?? this.gsvc.state()?.sessionId;
 
     if (!sessionId) {
       void this.router.navigate(['/']);

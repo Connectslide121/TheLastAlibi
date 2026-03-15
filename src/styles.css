@@ -56,7 +56,7 @@ body {
   inset: 0;
   pointer-events: none;
   z-index: 9999;
-  opacity: 0.06;
+  opacity: 0.14;
   background-repeat: repeat;
   background-size: 256px 256px;
 }
