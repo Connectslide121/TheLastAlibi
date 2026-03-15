@@ -212,13 +212,6 @@ export class HomeView implements OnInit {
   }
 
   startNewCase(): void {
-    const hasCases = this.savedCases().length > 0;
-    if (hasCases) {
-      const ok = confirm(
-        'You have saved investigations. Starting a new case will not delete them — you can resume them later. Continue?',
-      );
-      if (!ok) return;
-    }
     const style =
       this.selectedStyle === 'Surprise Me'
         ? ART_STYLES[Math.floor(Math.random() * (ART_STYLES.length - 1))]

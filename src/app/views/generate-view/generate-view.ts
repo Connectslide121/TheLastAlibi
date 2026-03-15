@@ -75,6 +75,26 @@ const CASE_TYPE_LABELS: Record<string, string> = {
             </span>
           </div>
 
+          <!-- Hero image (appears once briefing image is generated) -->
+          @if (readyPkg()?.briefingImageUrl) {
+            <div
+              class="w-full rounded-lg overflow-hidden"
+              style="aspect-ratio: 3/2; border: var(--border-style); box-shadow: var(--shadow-style)"
+            >
+              <img
+                [src]="readyPkg()!.briefingImageUrl"
+                [alt]="readyPkg()?.metadata?.title"
+                class="w-full h-full object-cover"
+              />
+            </div>
+          } @else {
+            <!-- Skeleton while image loads -->
+            <div
+              class="w-full rounded-lg animate-pulse"
+              style="aspect-ratio: 3/2; background: var(--color-surface); border: var(--border-style)"
+            ></div>
+          }
+
           <!-- Briefing text -->
           <div
             class="rounded-lg p-6"
@@ -93,28 +113,6 @@ const CASE_TYPE_LABELS: Record<string, string> = {
             >
               {{ readyPkg()?.metadata?.briefing }}
             </p>
-          </div>
-
-          <!-- Act previews -->
-          <div class="grid grid-cols-3 gap-3">
-            @for (act of actPreviews(); track act.label) {
-              <div
-                class="rounded-lg p-4 flex flex-col gap-2"
-                style="background: var(--color-surface); border: var(--border-style)"
-              >
-                <span
-                  class="font-mono text-xs tracking-widest uppercase"
-                  style="color: var(--color-accent)"
-                  >{{ act.label }}</span
-                >
-                <p
-                  class="text-xs leading-relaxed opacity-70"
-                  style="color: var(--color-text); font-family: var(--font-body)"
-                >
-                  {{ act.summary }}
-                </p>
-              </div>
-            }
           </div>
 
           <!-- Difficulty badge -->
@@ -210,19 +208,11 @@ export class GenerateView implements OnInit {
     return CASE_TYPE_LABELS[type] ?? CASE_TYPE_LABELS['other'];
   };
 
-  readonly actPreviews = () => {
-    const m = this.readyPkg()?.metadata;
-    if (!m) return [];
-    return [
-      { label: 'Act I', summary: m.act1Summary },
-      { label: 'Act II', summary: m.act2Summary },
-      { label: 'Act III', summary: m.act3Summary },
-    ];
-  };
-
   ngOnInit(): void {
     const nav = this.router.getCurrentNavigation();
-    const state = nav?.extras?.state as { difficulty?: Difficulty; style?: string } | undefined;
+    const state = (nav?.extras?.state ?? (window.history.state as Record<string, unknown>)) as
+      | { difficulty?: Difficulty; style?: string }
+      | undefined;
     if (state?.difficulty) this.difficulty = state.difficulty;
     if (state?.style) this.style = state.style;
     this.generate();
@@ -239,15 +229,22 @@ export class GenerateView implements OnInit {
 
         this.caseStore.storeCase(pkg).subscribe(() => {
           this.gameState.initState(pkg.id);
-
-          // Kick off image generation in the background — don't block navigation
-          this.imageService.generateAllCaseImages(pkg).subscribe({
-            next: (updated) => this.caseStore.storeCase(updated).subscribe(),
-          });
-
-          // Show the briefing screen instead of navigating immediately
           this.readyPkg.set(pkg);
-          this.phase.set('briefing');
+
+          // Drive the final image-generation step in the loading screen
+          this.llm.markImageStepActive();
+          this.imageService.generateAllCaseImages(pkg).subscribe({
+            next: (updated) => this.readyPkg.set(updated),
+            complete: () => {
+              this.llm.markImageStepDone();
+              this.phase.set('briefing');
+            },
+            error: () => {
+              // Images failed — still show briefing without them
+              this.llm.markImageStepDone();
+              this.phase.set('briefing');
+            },
+          });
         });
       },
       error: (err: Error) => {

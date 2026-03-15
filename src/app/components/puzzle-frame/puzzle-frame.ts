@@ -1,4 +1,13 @@
-import { Component, input, output, signal, computed, inject, HostListener } from '@angular/core';
+import {
+  Component,
+  input,
+  output,
+  signal,
+  computed,
+  inject,
+  HostListener,
+  effect,
+} from '@angular/core';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { PuzzleEvent, Clue } from '../../models';
 
@@ -7,11 +16,11 @@ import { PuzzleEvent, Clue } from '../../models';
   standalone: true,
   template: `
     <div
-      class="flex flex-col gap-4 rounded border bg-(--color-surface) p-6"
+      class="flex flex-col gap-4 rounded border bg-(--color-surface) p-6 h-full"
       style="border-color: rgba(201,168,76,0.3);"
     >
       <!-- Header -->
-      <div class="flex flex-col gap-1">
+      <div class="flex flex-col gap-1 shrink-0">
         <h2 class="text-(--color-accent) font-serif font-bold text-xl">{{ puzzle().title }}</h2>
         <p class="text-(--color-text) text-sm opacity-70">{{ puzzle().description }}</p>
       </div>
@@ -19,7 +28,7 @@ import { PuzzleEvent, Clue } from '../../models';
       <!-- Reward clue preview (blurred until solved) -->
       @if (rewardClue()) {
         <div
-          class="flex items-center gap-3 p-3 rounded border transition-all duration-700"
+          class="flex items-center gap-3 p-3 rounded border transition-all duration-700 shrink-0"
           style="border-color: rgba(201,168,76,0.2); background: var(--color-secondary);"
           [class.blur-sm]="!solved()"
           [class.opacity-50]="!solved()"
@@ -42,7 +51,7 @@ import { PuzzleEvent, Clue } from '../../models';
 
       <!-- Sandboxed puzzle iframe -->
       <div
-        class="w-full rounded overflow-hidden border transition-opacity"
+        class="w-full flex-1 rounded overflow-hidden border transition-opacity min-h-0"
         style="border-color: rgba(201,168,76,0.2);"
         [class.opacity-40]="solved()"
       >
@@ -50,7 +59,7 @@ import { PuzzleEvent, Clue } from '../../models';
         <iframe
           [srcdoc]="safeSrcdoc()"
           sandbox="allow-scripts"
-          class="w-full min-h-100 bg-white border-0"
+          class="w-full h-full border-0 bg-white"
           title="Puzzle"
         >
         </iframe>
@@ -115,6 +124,17 @@ export class PuzzleFrameComponent {
   );
 
   private readonly sanitizer = inject(DomSanitizer);
+
+  constructor() {
+    effect(() => {
+      const p = this.puzzle();
+      console.group(`[PuzzleFrame] "${p.title}" (id: ${p.id})`);
+      console.log('htmlComponent length:', p.htmlComponent?.length ?? 0);
+      console.log('htmlComponent preview (first 500 chars):', p.htmlComponent?.slice(0, 500));
+      console.log('full htmlComponent:', p.htmlComponent);
+      console.groupEnd();
+    });
+  }
 
   @HostListener('window:message', ['$event'])
   onMessage(event: MessageEvent<{ type?: string; puzzleId?: string }>): void {

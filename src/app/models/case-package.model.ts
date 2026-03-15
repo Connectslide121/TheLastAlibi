@@ -26,5 +26,9 @@ export interface CasePackage {
   visualDirection: VisualDirection;
   uiTheme: UITheme;
   imagePromptTemplates: ImagePromptTemplates;
+  briefingImageUrl?: string;
+  act1ImageUrl?: string;
+  act2ImageUrl?: string;
+  act3ImageUrl?: string;
   generatedAt: string;
 }

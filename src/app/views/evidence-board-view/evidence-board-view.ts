@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { CaseStoreService } from '../../services/case-store.service';
 import { GameStateService } from '../../services/game-state.service';
+import { ImageService } from '../../services/image.service';
 import { CasePackage, Suspect, Clue, EvidenceBoardNote } from '../../models';
 
 interface BoardCard {
@@ -250,6 +251,196 @@ const CARD_H = 130; // approx card height for midpoint calc
           </div>
         }
       </div>
+
+      <!-- ===== Suspect Detail Modal ===== -->
+      @if (expandedSuspect()) {
+        <div
+          class="fixed inset-0 z-80 flex items-center justify-center p-4"
+          style="background: rgba(0,0,0,0.85)"
+          (click)="expandedSuspect.set(null)"
+        >
+          <div
+            class="relative w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-lg flex flex-col"
+            style="background: var(--color-secondary); border: var(--border-style); animation: fadeIn 0.2s ease both"
+            (click)="$event.stopPropagation()"
+          >
+            <button
+              type="button"
+              (click)="expandedSuspect.set(null)"
+              class="absolute top-3 right-3 z-10 p-1.5 rounded-full opacity-60 hover:opacity-100 cursor-pointer transition-opacity"
+              style="background: var(--color-surface)"
+            >
+              <span class="material-icons mi-md" style="color: var(--color-text)">close</span>
+            </button>
+            <div
+              class="w-full overflow-hidden rounded-t-lg"
+              style="aspect-ratio: 4/3; background: var(--color-surface)"
+            >
+              @if (expandedSuspect()!.imageUrl) {
+                <img
+                  [src]="expandedSuspect()!.imageUrl"
+                  [alt]="expandedSuspect()!.name"
+                  class="w-full h-full object-cover"
+                />
+              } @else {
+                <div class="w-full h-full flex items-center justify-center opacity-20">
+                  <span class="material-icons" style="font-size: 5rem; color: var(--color-text)"
+                    >person</span
+                  >
+                </div>
+              }
+            </div>
+            <div class="p-6 flex flex-col gap-4">
+              <div class="flex flex-col gap-1">
+                <h2 class="font-heading text-2xl" style="color: var(--color-accent)">
+                  {{ expandedSuspect()!.name }}
+                </h2>
+                <p class="font-mono text-sm" style="color: var(--color-text-muted)">
+                  {{ expandedSuspect()!.age }} · {{ expandedSuspect()!.occupation }}
+                </p>
+                <p class="font-mono text-xs mt-0.5" style="color: var(--color-text-muted)">
+                  {{ expandedSuspect()!.relationship }}
+                </p>
+              </div>
+              <p
+                class="text-sm leading-relaxed"
+                style="font-family: var(--font-body); color: var(--color-text)"
+              >
+                {{ expandedSuspect()!.description }}
+              </p>
+              @if (isInterviewed(expandedSuspect()!.id)) {
+                <div
+                  class="rounded p-4 flex flex-col gap-2"
+                  style="background: var(--color-surface); border: var(--border-style)"
+                >
+                  <span
+                    class="font-mono text-xs uppercase tracking-widest"
+                    style="color: var(--color-accent)"
+                    >Stated Alibi</span
+                  >
+                  <p
+                    class="text-sm leading-relaxed"
+                    style="font-family: var(--font-body); color: var(--color-text)"
+                  >
+                    {{ expandedSuspect()!.alibi }}
+                  </p>
+                </div>
+              }
+              <button
+                type="button"
+                (click)="expandedSuspect.set(null)"
+                class="w-full py-2.5 rounded font-mono text-xs uppercase tracking-widest cursor-pointer transition-opacity hover:opacity-80"
+                style="border: var(--border-style); color: var(--color-text-muted)"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- ===== Clue Detail Modal ===== -->
+      @if (expandedClue()) {
+        <div
+          class="fixed inset-0 z-80 flex items-center justify-center p-4"
+          style="background: rgba(0,0,0,0.85)"
+          (click)="expandedClue.set(null)"
+        >
+          <div
+            class="relative w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-lg flex flex-col"
+            style="background: var(--color-secondary); border: var(--border-style); animation: fadeIn 0.2s ease both"
+            (click)="$event.stopPropagation()"
+          >
+            <button
+              type="button"
+              (click)="expandedClue.set(null)"
+              class="absolute top-3 right-3 z-10 p-1.5 rounded-full opacity-60 hover:opacity-100 cursor-pointer transition-opacity"
+              style="background: var(--color-surface)"
+            >
+              <span class="material-icons mi-md" style="color: var(--color-text)">close</span>
+            </button>
+            <div
+              class="w-full overflow-hidden rounded-t-lg"
+              style="aspect-ratio: 16/9; background: var(--color-surface)"
+            >
+              @if (expandedClue()!.imageUrl) {
+                <img
+                  [src]="expandedClue()!.imageUrl"
+                  [alt]="expandedClue()!.name"
+                  class="w-full h-full object-cover"
+                />
+              } @else {
+                <div class="w-full h-full flex items-center justify-center opacity-20">
+                  <span class="material-icons" style="font-size: 5rem; color: var(--color-text)"
+                    >search</span
+                  >
+                </div>
+              }
+            </div>
+            <div class="p-6 flex flex-col gap-4">
+              <div class="flex items-center gap-2">
+                <span class="material-icons mi-md" style="color: var(--color-accent)"
+                  >manage_search</span
+                >
+                <h2 class="font-heading text-2xl" style="color: var(--color-accent)">
+                  {{ expandedClue()!.name }}
+                </h2>
+              </div>
+              <p
+                class="text-base leading-relaxed"
+                style="font-family: var(--font-body); color: var(--color-text)"
+              >
+                {{ expandedClue()!.description }}
+              </p>
+              <div
+                class="rounded p-4 flex flex-col gap-2"
+                style="background: var(--color-surface); border: var(--border-style)"
+              >
+                <span
+                  class="font-mono text-xs uppercase tracking-widest flex items-center gap-1.5"
+                  style="color: var(--color-accent)"
+                >
+                  <span class="material-icons" style="font-size: 0.9rem">lightbulb</span>
+                  What this reveals
+                </span>
+                <p
+                  class="text-sm leading-relaxed italic"
+                  style="font-family: var(--font-body); color: var(--color-text)"
+                >
+                  {{ expandedClue()!.revealsInfo }}
+                </p>
+              </div>
+              <p class="font-mono text-xs" style="color: var(--color-text-muted)">
+                <span class="material-icons" style="font-size: 0.8rem; vertical-align: middle"
+                  >location_on</span
+                >
+                Found at: {{ clueLocationName(expandedClue()!.locationId) }}
+              </p>
+              <button
+                type="button"
+                (click)="expandedClue.set(null)"
+                class="w-full py-2.5 rounded font-mono text-xs uppercase tracking-widest cursor-pointer transition-opacity hover:opacity-80"
+                style="border: var(--border-style); color: var(--color-text-muted)"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      }
+
+      <style>
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+            transform: scale(0.97);
+          }
+          to {
+            opacity: 1;
+            transform: scale(1);
+          }
+        }
+      </style>
     </div>
   `,
 })
@@ -257,12 +448,15 @@ export class EvidenceBoardView implements OnInit {
   private readonly router = inject(Router);
   private readonly caseStore = inject(CaseStoreService);
   private readonly gsvc = inject(GameStateService);
+  private readonly imageService = inject(ImageService);
 
   private readonly casePackage = signal<CasePackage | null>(null);
 
   readonly connectMode = signal(false);
   readonly firstConnectId = signal<string | null>(null);
   readonly dragId = signal<string | null>(null);
+  readonly expandedSuspect = signal<Suspect | null>(null);
+  readonly expandedClue = signal<Clue | null>(null);
 
   private dragOffsetX = 0;
   private dragOffsetY = 0;
@@ -360,7 +554,13 @@ export class EvidenceBoardView implements OnInit {
       return;
     }
     this.caseStore.loadCase(sessionId).subscribe((pkg) => {
-      if (pkg) this.casePackage.set(pkg);
+      if (pkg) {
+        this.casePackage.set(pkg);
+        // Re-hydrate blob URLs from IndexedDB image cache (they don't survive page refresh)
+        this.imageService.generateAllCaseImages(pkg).subscribe({
+          next: (updated) => this.casePackage.set(updated),
+        });
+      }
     });
   }
 
@@ -437,21 +637,34 @@ export class EvidenceBoardView implements OnInit {
   onPointerUp(event: PointerEvent): void {
     this.dragId.set(null);
     this.isDraggingNote = false;
-    this.hasDragged = false;
+    // Do NOT reset hasDragged here — click fires after pointerup and needs to read it.
+    // hasDragged is reset at the next pointerdown instead.
   }
 
   onCardClick(card: BoardCard): void {
     if (this.hasDragged) return; // was a drag
 
-    if (!this.connectMode()) return;
+    if (this.connectMode()) {
+      const first = this.firstConnectId();
+      if (!first) {
+        this.firstConnectId.set(card.id);
+      } else if (first !== card.id) {
+        this.gsvc.addBoardConnection(first, card.id);
+        this.connectMode.set(false);
+        this.firstConnectId.set(null);
+      }
+      return;
+    }
 
-    const first = this.firstConnectId();
-    if (!first) {
-      this.firstConnectId.set(card.id);
-    } else if (first !== card.id) {
-      this.gsvc.addBoardConnection(first, card.id);
-      this.connectMode.set(false);
-      this.firstConnectId.set(null);
+    // Open detail modal
+    const pkg = this.casePackage();
+    if (!pkg) return;
+    if (card.type === 'suspect') {
+      const suspect = pkg.suspects.find((s) => s.id === card.id) ?? null;
+      this.expandedSuspect.set(suspect);
+    } else {
+      const clue = pkg.clues.find((c) => c.id === card.id) ?? null;
+      this.expandedClue.set(clue);
     }
   }
 
@@ -499,5 +712,13 @@ export class EvidenceBoardView implements OnInit {
 
   goBack(): void {
     void this.router.navigate(['/investigation']);
+  }
+
+  isInterviewed(suspectId: string): boolean {
+    return this.gsvc.state()?.interviewedSuspectIds.includes(suspectId) ?? false;
+  }
+
+  clueLocationName(locationId: string): string {
+    return this.casePackage()?.locations.find((l) => l.id === locationId)?.name ?? locationId;
   }
 }

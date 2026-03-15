@@ -135,6 +135,7 @@ const STEP_DEFS: Omit<GenerationStepStatus, 'status'>[] = [
   { label: 'Hint Ladder', detail: 'Progressive hints & solution narrative' },
   { label: 'Puzzle Components', detail: 'Self-contained interactive HTML puzzles' },
   { label: 'Final Assembly', detail: 'Stitching all pieces into the case file' },
+  { label: 'Generating Images', detail: 'Illustrating suspects, locations & evidence' },
 ];
 
 function makeSteps(): GenerationStepStatus[] {
@@ -156,6 +157,24 @@ export class LlmService {
       // Mark the first pending step after the done ones as active
       const firstPending = next.findIndex((s) => s.status === 'pending');
       if (firstPending !== -1) next[firstPending] = { ...next[firstPending], status: 'active' };
+      return next;
+    });
+  }
+
+  markImageStepActive(): void {
+    const idx = STEP_DEFS.length - 1; // last step
+    this.generationSteps.update((steps) => {
+      const next = [...steps];
+      next[idx] = { ...next[idx], status: 'active' };
+      return next;
+    });
+  }
+
+  markImageStepDone(): void {
+    const idx = STEP_DEFS.length - 1;
+    this.generationSteps.update((steps) => {
+      const next = [...steps];
+      next[idx] = { ...next[idx], status: 'done' };
       return next;
     });
   }
@@ -237,7 +256,9 @@ export class LlmService {
           this.markDone(9);
           return of({ ...ctx, puzzles: [] as PuzzleEvent[] });
         }
-        return forkJoin(ctx.puzzleSpecs.map((spec) => this.step7bPuzzleHtml(spec, ctx.style))).pipe(
+        return forkJoin(
+          ctx.puzzleSpecs.map((spec) => this.step7bPuzzleHtml(spec, ctx.style, ctx.visual.uiTheme)),
+        ).pipe(
           map((puzzles) => {
             this.markDone(9);
             return { ...ctx, puzzles };
@@ -272,38 +293,44 @@ export class LlmService {
       genius: 5,
     };
 
+    const seed = Math.floor(Math.random() * 1_000_000);
     const prompt =
-      `You are designing a detective mystery for an interactive game called "The Last Alibi".\n` +
-      `DIFFICULTY: ${difficulty} â€” ${guide[difficulty]}\n` +
-      `ART STYLE: ${style}\n\n` +
-      `Output ONLY a raw JSON object. No markdown fences, no explanation.\n\n` +
+      `You are designing a UNIQUE detective mystery for an interactive game called "The Last Alibi".\n` +
+      `DIFFICULTY: ${difficulty} \u2014 ${guide[difficulty]}\n` +
+      `ART STYLE: ${style}\n` +
+      `CREATIVITY SEED: ${seed} \u2014 use this to produce a completely original, unexpected scenario.\n\n` +
+      `CRITICAL: Invent a wholly ORIGINAL case. Do NOT use "manor house murder", Victorian settings,\n` +
+      `jealous sisters, or any other clich\u00e9. The setting, crime type, era, and cast must be fresh.\n\n` +
+      `Output ONLY a raw JSON object. No markdown fences, no explanation.\n` +
+      `ALL string values below are FORMAT PLACEHOLDERS \u2014 replace every one with original content.\n\n` +
       `{\n` +
-      `  "caseSlug": "the-manor-house-murder",\n` +
-      `  "title": "The Manor House Murder",\n` +
-      `  "subtitle": "one-line tagline",\n` +
-      `  "caseType": "murder",\n` +
-      `  "setting": "1930s English country manor",\n` +
-      `  "briefing": "2-3 sentences the detective reads on arrival",\n` +
-      `  "act1Summary": "what the player discovers in Act 1",\n` +
-      `  "act2Summary": "what deepens in Act 2",\n` +
-      `  "act3Summary": "how truth crystallises in Act 3",\n` +
-      `  "culpritLabel": "the jealous younger sister",\n` +
-      `  "motive": "specific motive",\n` +
-      `  "method": "specific method e.g. arsenic in the brandy",\n` +
-      `  "trueTimeline": "paragraph: what actually happened step-by-step",\n` +
-      `  "keyContradiction": "the single fact that exposes the culprit",\n` +
-      `  "redHerringExplanation": "why the red herring seemed guilty but was not",\n` +
-      `  "suspectLabels": ["the jealous younger sister", "the business partner", "..."],\n` +
-      `  "lyingSuspectLabels": ["the jealous younger sister"],\n` +
-      `  "mistakenSuspectLabels": ["the wronged servant"],\n` +
-      `  "hidingSecretSuspectLabels": ["the family lawyer"]\n` +
+      `  "caseSlug": "<your-unique-kebab-slug>",\n` +
+      `  "title": "<Your Original Case Title>",\n` +
+      `  "subtitle": "<one-line tagline>",\n` +
+      `  "caseType": "<murder|theft|disappearance|sabotage|other>",\n` +
+      `  "setting": "<original setting \u2014 era, location, atmosphere>",\n` +
+      `  "briefing": "<2-3 sentences the detective reads on arrival>",\n` +
+      `  "act1Summary": "<what the player discovers in Act 1>",\n` +
+      `  "act2Summary": "<what deepens in Act 2>",\n` +
+      `  "act3Summary": "<how truth crystallises in Act 3>",\n` +
+      `  "culpritLabel": "<role or description of the guilty party>",\n` +
+      `  "motive": "<specific motive>",\n` +
+      `  "method": "<specific method>",\n` +
+      `  "trueTimeline": "<paragraph: what actually happened step-by-step>",\n` +
+      `  "keyContradiction": "<the single fact that exposes the culprit>",\n` +
+      `  "redHerringExplanation": "<why the red herring seemed guilty but was not>",\n` +
+      `  "suspectLabels": ["<role 1>", "<role 2>", "<more roles>"],\n` +
+      `  "lyingSuspectLabels": ["<role>"],\n` +
+      `  "mistakenSuspectLabels": ["<role>"],\n` +
+      `  "hidingSecretSuspectLabels": ["<role>"]\n` +
       `}\n\n` +
       `Constraints:\n` +
-      `- caseSlug must be kebab-case\n` +
-      `- culpritLabel must appear in suspectLabels\n` +
+      `- Replace ALL angle-bracket placeholders with real original values\n` +
+      `- caseSlug must be kebab-case derived from your title\n` +
+      `- culpritLabel must appear verbatim in suspectLabels\n` +
       `- suspectLabels must have exactly ${suspectCount[difficulty]} entries\n` +
       `- lyingSuspectLabels, mistakenSuspectLabels, hidingSecretSuspectLabels are subsets of suspectLabels\n` +
-      `- caseType: "murder"|"theft"|"disappearance"|"sabotage"|"other"`;
+      `- caseType must be one of: "murder"|"theft"|"disappearance"|"sabotage"|"other"`;
 
     return this.callLlm(prompt).pipe(map((raw) => this.parseJson<CaseFoundation>(raw)));
   }
@@ -588,7 +615,11 @@ export class LlmService {
   // Step 7b â€” Puzzle HTML (one call per puzzle)
   // ---------------------------------------------------------------------------
 
-  private step7bPuzzleHtml(spec: PuzzleSpec, style: string): Observable<PuzzleEvent> {
+  private step7bPuzzleHtml(
+    spec: PuzzleSpec,
+    style: string,
+    theme: UITheme,
+  ): Observable<PuzzleEvent> {
     const prompt =
       `Create a self-contained HTML puzzle for a detective mystery game.\n\n` +
       `Puzzle title: ${spec.title}\n` +
@@ -599,13 +630,16 @@ export class LlmService {
       `Requirements:\n` +
       `- Complete valid HTML document starting with <!DOCTYPE html>\n` +
       `- ALL CSS and JS inline (no external files, no CDN links)\n` +
-      `- Dark theme: background #1a1a2e, gold accents #c9a84c, cream text #e8e0d0\n` +
+      `- Use these exact theme colors from the game: page background ${theme.primaryColor}, panel/card background ${theme.secondaryColor}, accent/highlight color ${theme.accentColor}, surface color ${theme.surfaceColor}, body text ${theme.textColor}\n` +
       `- Atmosphere matches: ${style}\n` +
       `- MUST call: window.parent.postMessage({type:"PUZZLE_SOLVED",puzzleId:"${spec.id}"},"*") exactly once when solved\n` +
       `- Must be solvable without outside knowledge\n` +
       `- No localStorage, sessionStorage, or cookies\n` +
       `- No alert() or confirm()\n` +
-      `- Show a clear visual success state when solved\n\n` +
+      `- Show a clear visual success state when solved\n` +
+      `- ABSOLUTELY NO <img> tags, no <image> tags, no base64 data URIs, no SVG images — text and CSS only\n` +
+      `- Do NOT embed any binary data or base64 encoded content of any kind\n` +
+      `- Keep the HTML under 200 lines total\n\n` +
       `Output ONLY the raw HTML. No JSON wrapper, no markdown fences, no explanation.`;
 
     return this.callLlm(prompt).pipe(
@@ -683,31 +717,46 @@ export class LlmService {
     style: string,
   ): Observable<VisualResult> {
     const prompt =
-      `Generate visual direction and UI theme for the detective mystery "${f.title}".\n` +
-      `Style preference: ${style}\n` +
-      `Setting: ${f.setting}\n` +
-      `Case type: ${f.caseType}\n\n` +
-      `Output ONLY raw JSON. No markdown fences.\n\n` +
+      `You are generating a visual theme and UI color scheme for the detective mystery "${f.title}".\n` +
+      `Style: "${style}" | Setting: ${f.setting} | Case type: ${f.caseType}\n\n` +
+      `STEP 1 — DECIDE THEME BRIGHTNESS\n` +
+      `Based on "${style}", decide if the UI should be DARK (dark backgrounds, light text) or\n` +
+      `LIGHT (light/pale backgrounds, dark text). Write your decision before the JSON as a comment, then follow it.\n\n` +
+      `STEP 2 — PICK COLORS THAT MATCH YOUR DECISION\n` +
+      `For DARK themes: primaryColor luminance ≤ 0.15, textColor luminance ≥ 0.60\n` +
+      `For LIGHT themes: primaryColor luminance ≥ 0.60, textColor luminance ≤ 0.20\n` +
+      `Luminance of #rrggbb = 0.2126*(r/255)^2.2 + 0.7152*(g/255)^2.2 + 0.0722*(b/255)^2.2 (simplified sRGB)\n\n` +
+      `STEP 3 — VERIFY CONTRAST BEFORE OUTPUTTING\n` +
+      `Verify ALL of these pairs pass WCAG AA (contrast ratio ≥ 4.5:1):\n` +
+      `  A) textColor on primaryColor  (body text on page background)\n` +
+      `  B) textColor on secondaryColor (body text on card/panel backgrounds)\n` +
+      `  C) textColor on surfaceColor  (body text on elevated surfaces)\n` +
+      `  D) accentColor on primaryColor (headings/labels on page background)\n` +
+      `  E) accentColor on secondaryColor (headings on cards)\n` +
+      `Contrast ratio = (L1+0.05)/(L2+0.05) where L1 is the lighter luminance.\n` +
+      `If any pair fails, adjust until all five pass.\n\n` +
+      `Output ONLY raw JSON. No markdown fences. No comments inside the JSON.\n` +
+      `Replace every placeholder in angle brackets with a real value.\n\n` +
       `{\n` +
       `  "visualDirection": {\n` +
-      `    "artStyle": "...",\n` +
-      `    "mood": "...",\n` +
+      `    "artStyle": "<short description of the visual style>",\n` +
+      `    "mood": "<emotional mood>",\n` +
       `    "colorPalette": ["#hex1", "#hex2", "#hex3", "#hex4", "#hex5"],\n` +
-      `    "lightingStyle": "...",\n` +
-      `    "renderingStyle": "...",\n` +
-      `    "globalStylePrompt": "compact Imagen style prefix for all images",\n` +
-      `    "negativePrompt": "things to avoid in all images"\n` +
+      `    "lightingStyle": "<describe lighting>",\n` +
+      `    "renderingStyle": "<describe rendering approach>",\n` +
+      `    "globalStylePrompt": "<compact Imagen style prefix for all images>",\n` +
+      `    "negativePrompt": "<things to avoid in all images>"\n` +
       `  },\n` +
       `  "uiTheme": {\n` +
-      `    "primaryColor": "#1a1a2e",\n` +
-      `    "secondaryColor": "#16213e",\n` +
-      `    "accentColor": "#c9a84c",\n` +
-      `    "surfaceColor": "#0f0f23",\n` +
-      `    "textColor": "#e8e0d0",\n` +
-      `    "panelStyle": "raised",\n` +
-      `    "borderStyle": "1px solid rgba(201,168,76,0.3)",\n` +
-      `    "shadowStyle": "0 4px 24px rgba(0,0,0,0.6)",\n` +
-      `    "textureFamily": "paper"\n` +
+      `    "primaryColor": "<#rrggbb — page background>",\n` +
+      `    "secondaryColor": "<#rrggbb — panel/card background, same dark/light direction as primary>",\n` +
+      `    "accentColor": "<#rrggbb — heading/highlight color, ≥4.5:1 on both primary and secondary>",\n` +
+      `    "surfaceColor": "<#rrggbb — elevated surface, same dark/light direction as primary>",\n` +
+      `    "textColor": "<#rrggbb — body text, ≥4.5:1 on primary, secondary, AND surface>",\n` +
+      `    "panelStyle": "<flat|raised|inset>",\n` +
+      `    "borderStyle": "<e.g. 1px solid rgba(r,g,b,0.35)>",\n` +
+      `    "shadowStyle": "<e.g. 0 4px 24px rgba(0,0,0,0.5)>",\n` +
+      `    "textureFamily": "<paper|grain|cork|metal|leather|fabric|pixel_noise>"\n` +
       `  },\n` +
       `  "imagePromptTemplates": {\n` +
       `    "suspectPortrait": "${style}, portrait of {name}, {occupation}, {description}, dramatic lighting",\n` +
@@ -717,12 +766,16 @@ export class LlmService {
       `    "puzzleObject": "${style}, antique object, intricate detail"\n` +
       `  }\n` +
       `}\n\n` +
-      `Rules:\n` +
-      `- All hex colors must be valid 6-digit hex codes (#rrggbb)\n` +
-      `- colorPalette must have 4-6 entries\n` +
-      `- textureFamily: "paper"|"grain"|"cork"|"metal"|"leather"|"fabric"|"pixel_noise"\n` +
-      `- panelStyle: "flat"|"raised"|"inset"\n` +
-      `- uiTheme colors must complement the colorPalette and match the ${style} atmosphere`;
+      `Hard rules (violations will break the game UI):\n` +
+      `- All hex colors: exactly #rrggbb format, no comments or extra text\n` +
+      `- colorPalette: 4-6 entries\n` +
+      `- textureFamily: exactly one of paper|grain|cork|metal|leather|fabric|pixel_noise\n` +
+      `- panelStyle: exactly one of flat|raised|inset\n` +
+      `- secondary and surface must be in the same dark/light direction as primary (all dark OR all light)\n` +
+      `- textColor contrast ≥4.5:1 against primary, secondary, AND surface — if unsure, use near-white (#f0ece0) for dark themes or near-black (#1a1a1a) for light themes\n` +
+      `- accentColor contrast ≥4.5:1 against primary and secondary — accent can be saturated/colorful but must still be readable as text\n` +
+      `- Do NOT make accent and text the same color\n` +
+      `- The palette must evoke "${style}" — avoid defaulting to generic dark navy/gold unless it specifically fits`;
 
     return this.callLlm(prompt).pipe(map((raw) => this.parseJson<VisualResult>(raw)));
   }
@@ -863,9 +916,18 @@ export class LlmService {
   }
 
   private stripHtmlFences(raw: string): string {
-    return raw
-      .replace(/^```(?:html)?\s*/i, '')
-      .replace(/```\s*$/i, '')
-      .trim();
+    // 1. Extract HTML from a fenced code block anywhere in the string (```html ... ```)
+    const fenceMatch = raw.match(/```(?:html)?\s*([\s\S]*?)```/i);
+    if (fenceMatch) return fenceMatch[1].trim();
+
+    // 2. Find where the HTML document starts, discarding any LLM preamble
+    const doctypeIdx = raw.indexOf('<!DOCTYPE');
+    if (doctypeIdx >= 0) return raw.slice(doctypeIdx).trim();
+
+    const htmlTagIdx = raw.search(/<html[\s>]/i);
+    if (htmlTagIdx >= 0) return raw.slice(htmlTagIdx).trim();
+
+    // 3. Fallback — return trimmed raw text as-is
+    return raw.trim();
   }
 }
