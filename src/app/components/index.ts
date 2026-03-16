@@ -1,6 +1,7 @@
 export * from './loading-screen/loading-screen';
 export * from './clue-card/clue-card';
 export * from './suspect-card/suspect-card';
+export * from './interview-chat/interview-chat';
 export * from './location-card/location-card';
 export * from './timeline/timeline';
 export * from './dialogue-box/dialogue-box';

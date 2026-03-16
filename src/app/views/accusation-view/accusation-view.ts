@@ -230,7 +230,8 @@ export class AccusationView implements OnInit {
     const pkg = this.casePackage();
     const state = this.gameState();
     if (!pkg || !state) return [];
-    return pkg.suspects.filter((s) => state.unlockedSuspectIds.includes(s.id));
+    const visibleIds = new Set([...state.unlockedSuspectIds, ...state.interviewedSuspectIds]);
+    return pkg.suspects.filter((s) => visibleIds.has(s.id));
   });
 
   readonly foundClues = computed((): Clue[] => {

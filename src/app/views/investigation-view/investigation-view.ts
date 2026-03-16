@@ -5,6 +5,7 @@ import { DebugTraceService } from '../../services/debug-trace.service';
 import { GameStateService } from '../../services/game-state.service';
 import { ThemeService } from '../../services/theme.service';
 import { ImageService } from '../../services/image.service';
+import { InterviewService, InterviewChatMessage } from '../../services/interview.service';
 import { repairEventGraph } from '../../utils/event-graph-repair';
 import {
   SuspectCardComponent,
@@ -15,6 +16,7 @@ import {
   DebugDashboardComponent,
   ToastService,
   LocationCardComponent,
+  InterviewChatComponent,
 } from '../../components';
 import {
   CasePackage,
@@ -46,6 +48,7 @@ type CaseFileImageLightbox = {
     ActBannerComponent,
     DebugDashboardComponent,
     LocationCardComponent,
+    InterviewChatComponent,
   ],
   template: `
     <div class="h-screen flex flex-col bg-(--color-primary)">
@@ -1412,6 +1415,18 @@ type CaseFileImageLightbox = {
         <app-debug-dashboard [casePackage]="pkg" (closeRequested)="debugDashboardOpen.set(false)" />
       }
 
+      <!-- ===== LLM Interview Chat ===== -->
+      @if (activeInterviewSuspect() && casePackage()) {
+        <app-interview-chat
+          [suspect]="activeInterviewSuspect()!"
+          [casePackage]="casePackage()!"
+          [foundClues]="foundClues()"
+          [sessionId]="gameState()?.sessionId ?? ''"
+          [revisitTranscript]="revisitInterviewTranscript()"
+          (interviewClosed)="onInterviewClosed()"
+        />
+      }
+
       <style>
         @keyframes fadeIn {
           from {
@@ -1435,11 +1450,14 @@ export class InvestigationView implements OnInit {
   private readonly theme = inject(ThemeService);
   private readonly toast = inject(ToastService);
   private readonly imageService = inject(ImageService);
+  private readonly interviewService = inject(InterviewService);
 
   readonly isLoading = signal(true);
   readonly casePackage = signal<CasePackage | null>(null);
   readonly selectedEvent = signal<InvestigationEvent | null>(null);
   readonly activeDialogueLines = signal<DialogueLine[]>([]);
+  readonly activeInterviewSuspect = signal<Suspect | null>(null);
+  readonly revisitInterviewTranscript = signal<InterviewChatMessage[] | null>(null);
   readonly showActBanner = signal(false);
   readonly actBannerTitle = signal('');
   readonly actBannerSummary = signal('');
@@ -1767,8 +1785,13 @@ export class InvestigationView implements OnInit {
     if (event.dialogueSuspectId) {
       const suspect = this.casePackage()?.suspects.find((s) => s.id === event.dialogueSuspectId);
       if (suspect) {
-        this.activeDialogueLines.set(suspect.interviewDialogue);
         this.gsvc.interviewSuspect(event.dialogueSuspectId);
+        if (event.category === 'social') {
+          this.revisitInterviewTranscript.set(null);
+          this.activeInterviewSuspect.set(suspect);
+        } else {
+          this.activeDialogueLines.set(suspect.interviewDialogue);
+        }
       }
     } else if (event.category !== 'puzzle') {
       this.activeDialogueLines.set([]);
@@ -1783,6 +1806,13 @@ export class InvestigationView implements OnInit {
 
     if (event.dialogueSuspectId) {
       const suspect = this.casePackage()?.suspects.find((s) => s.id === event.dialogueSuspectId);
+      if (event.category === 'social' && suspect) {
+        const sessionId = this.gameState()?.sessionId ?? '';
+        const stored = this.interviewService.getStoredTranscript(sessionId, suspect.id);
+        this.revisitInterviewTranscript.set(stored);
+        this.activeInterviewSuspect.set(suspect);
+        return;
+      }
       this.activeDialogueLines.set(suspect?.interviewDialogue ?? []);
       return;
     }
@@ -1794,6 +1824,15 @@ export class InvestigationView implements OnInit {
     const event = this.selectedEvent();
     if (event && !this.isReplayingEvent(event.id)) this.completeCurrentEvent(event);
     this.activeDialogueLines.set([]);
+    this.replayingEventId.set(null);
+    this.selectedEvent.set(null);
+  }
+
+  onInterviewClosed(): void {
+    const event = this.selectedEvent();
+    if (event && !this.isReplayingEvent(event.id)) this.completeCurrentEvent(event);
+    this.activeInterviewSuspect.set(null);
+    this.revisitInterviewTranscript.set(null);
     this.replayingEventId.set(null);
     this.selectedEvent.set(null);
   }
