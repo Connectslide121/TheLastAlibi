@@ -21,6 +21,7 @@ import {
 } from '../models';
 import { DebugRequestMeta } from './debug-trace.service';
 import { WorkerLlmService } from './worker-llm';
+import { repairEventGraph } from '../utils/event-graph-repair';
 
 type Difficulty = CaseMetadata['difficulty'];
 
@@ -87,8 +88,13 @@ interface PuzzleConcept {
   puzzleType: PuzzleEvent['type'];
   puzzleDescription: string;
   puzzleLogic: string;
+  interactionInstructions: string;
   clues: string[];
+  answerPrompt: string;
+  answerPlaceholder: string;
+  answerFormat: string;
   solution: string;
+  acceptableAnswers: string[];
   validationLogic: string;
   uiConcept: string;
   hints: string[];
@@ -600,6 +606,7 @@ export class LlmService {
       `- category: "investigation"|"social"|"surprise"|"puzzle"|"deduction"\n` +
       `- Social events must have dialogueSuspectId set to a valid suspect id\n` +
       `- Generate exactly ${puzzleCount[difficulty]} event(s) with category "puzzle"; these must have puzzleLabel set to a short kebab-case label (e.g. "desk-cipher"), NOT null\n` +
+      `- Every puzzle event must have exactly 1 rewardsClueIds entry; that clue is the evidence unlocked by solving the puzzle\n` +
       `- All rewardsClueIds must be from the clue IDs list\n` +
       `- All dialogueSuspectId and unlocksSuspectIds values must be from the suspect IDs list\n` +
       `- unlockConditions referenceId must exist in the clue IDs, suspect IDs, or other event IDs in this array\n` +
@@ -625,37 +632,68 @@ export class LlmService {
     clues: CluesResult,
     events: EventSpec[],
   ): Observable<PuzzleConcept[]> {
-    const puzzleLabels = events.filter((e) => e.puzzleLabel).map((e) => e.puzzleLabel!);
-    if (puzzleLabels.length === 0) return of([]);
+    const puzzleEvents = events.filter(
+      (event): event is EventSpec & { puzzleLabel: string } => !!event.puzzleLabel,
+    );
+    if (puzzleEvents.length === 0) return of([]);
 
-    return forkJoin(puzzleLabels.map((label) => this.step7PuzzleConcept(f, clues, label)));
+    return forkJoin(puzzleEvents.map((event) => this.step7PuzzleConcept(f, clues, event)));
   }
 
   private step7PuzzleConcept(
     f: CaseFoundation,
     clues: CluesResult,
-    label: string,
+    event: EventSpec & { puzzleLabel: string },
   ): Observable<PuzzleConcept> {
+    const label = event.puzzleLabel;
     const availableClueIds = clues.clues.map((c) => c.id).join(', ');
     const puzzleId = `puzzle-${label}`;
+    const rewardedClueId = event.rewardsClueIds[0] ?? clues.importantClueId;
+    const rewardedClue =
+      clues.clues.find((clue) => clue.id === rewardedClueId) ??
+      clues.clues.find((clue) => clue.id === clues.importantClueId) ??
+      null;
+    const unlockSummary =
+      event.unlockConditions.length > 0
+        ? event.unlockConditions
+            .map((condition) => `${condition.type}:${condition.referenceId}`)
+            .join(', ')
+        : 'none';
+    const clueCatalog = clues.clues
+      .map(
+        (clue) => `- ${clue.id}: ${clue.name} | ${clue.description} | reveals: ${clue.revealsInfo}`,
+      )
+      .join('\n');
 
     const prompt =
       `Generate a single puzzle concept for the detective mystery "${f.title}" (${f.setting}).\n` +
+      `Event title: ${event.title}\n` +
+      `Event description: ${event.description}\n` +
+      `Event narration: ${event.narration}\n` +
+      `Unlock conditions already met before this puzzle: ${unlockSummary}\n` +
       `Puzzle label: ${label}\n` +
       `Required puzzle id: ${puzzleId}\n\n` +
+      `Reward clue for this puzzle is FIXED: ${rewardedClueId}${rewardedClue ? ` (${rewardedClue.name}: ${rewardedClue.revealsInfo})` : ''}\n` +
       `Available clue IDs for rewards: ${availableClueIds}\n\n` +
+      `Available evidence and clue context:\n${clueCatalog}\n\n` +
       `Your goal in this step is to ensure this puzzle has real logic, embedded clues, and a clearly intended solution before any HTML is written.\n` +
+      `The player must be able to solve it from the text clues and instructions alone; the HTML is only supplemental presentation.\n` +
       `Output ONLY raw JSON. No markdown fences.\n\n` +
       `{\n` +
       `  "label": "${label}",\n` +
       `  "id": "${puzzleId}",\n` +
-      `  "rewardedClueId": "<clue id from the available list above>",\n` +
+      `  "rewardedClueId": "${rewardedClueId}",\n` +
       `  "puzzleTitle": "The Brass Box Cipher",\n` +
       `  "puzzleType": "cipher",\n` +
-      `  "puzzleDescription": "what the player sees and can interact with, 1-2 sentences",\n` +
+      `  "puzzleDescription": "what the player sees when the puzzle opens, 1-2 sentences",\n` +
       `  "puzzleLogic": "the internal reasoning structure and how the clues lead to the answer",\n` +
+      `  "interactionInstructions": "clear player-facing instructions for how to use the clues and what to submit",\n` +
       `  "clues": ["explicit clue the player can inspect", "second clue that supports the logic", "optional third clue"],\n` +
+      `  "answerPrompt": "short label above the answer field",\n` +
+      `  "answerPlaceholder": "example of the expected input shape",\n` +
+      `  "answerFormat": "exact format the player should enter, such as a word, phrase, or ordered sequence",\n` +
       `  "solution": "the exact intended answer or final state the player must reach",\n` +
+      `  "acceptableAnswers": ["canonical answer", "allowed alternate spacing or punctuation variant"],\n` +
       `  "validationLogic": "the exact rule the HTML implementation should use to decide the puzzle is solved",\n` +
       `  "uiConcept": "a short description of the interface layout and interaction style",\n` +
       `  "hints": ["vague hint", "more specific", "points toward solution", "nearly explicit"]\n` +
@@ -664,10 +702,14 @@ export class LlmService {
       `- label must be exactly ${label}\n` +
       `- id must be exactly ${puzzleId}\n` +
       `- puzzleType: "cipher"|"lock"|"pattern"|"fragment"|"logic_grid"|"sequence"|"map"|"mechanical"\n` +
-      `- rewardedClueId must be from the available clue IDs\n` +
-      `- clues must contain 2-5 concrete puzzle clues the player can reason from\n` +
+      `- rewardedClueId must be exactly ${rewardedClueId}\n` +
+      `- clues must contain 2-5 concrete puzzle clues the player can reason from without outside knowledge\n` +
       `- puzzleLogic must describe how the puzzle actually works, not just its theme\n` +
+      `- interactionInstructions must make the required player action unambiguous\n` +
+      `- answerPrompt and answerPlaceholder must help the player understand what to type\n` +
+      `- answerFormat must describe the exact expected syntax\n` +
       `- solution must be explicit and fully solvable from the clues in the concept\n` +
+      `- acceptableAnswers must contain 1-6 exact strings the host validator may accept, including the canonical solution\n` +
       `- validationLogic must clearly define what exact player action or answer counts as solved\n` +
       `- uiConcept must describe a simple HTML-friendly interface\n` +
       `- hints must contain 3-5 entries\n` +
@@ -706,8 +748,13 @@ export class LlmService {
       `Type: ${concept.puzzleType}\n` +
       `What the player sees: ${concept.puzzleDescription}\n` +
       `Puzzle logic: ${concept.puzzleLogic}\n` +
+      `Player instructions: ${concept.interactionInstructions}\n` +
       `Embedded clues: ${concept.clues.join(' | ')}\n` +
+      `Answer prompt: ${concept.answerPrompt}\n` +
+      `Answer placeholder: ${concept.answerPlaceholder}\n` +
+      `Answer format: ${concept.answerFormat}\n` +
       `Intended solution: ${concept.solution}\n` +
+      `Accepted answers for the host validator: ${concept.acceptableAnswers.join(' | ')}\n` +
       `Validation logic: ${concept.validationLogic}\n` +
       `UI concept: ${concept.uiConcept}\n` +
       `Puzzle ID: ${concept.id}\n\n` +
@@ -716,15 +763,18 @@ export class LlmService {
       `- ALL CSS and JS inline (no external files, no CDN links)\n` +
       `- Use these exact theme colors from the game: page background ${theme.primaryColor}, panel/card background ${theme.secondaryColor}, accent/highlight color ${theme.accentColor}, surface color ${theme.surfaceColor}, body text ${theme.textColor}\n` +
       `- Atmosphere matches: ${style}\n` +
-      `- MUST implement the exact puzzle logic, clues, and validation rules from the concept above\n` +
-      `- MUST call: window.parent.postMessage({type:"PUZZLE_SOLVED",puzzleId:"${concept.id}"},"*") exactly once when solved\n` +
+      `- The host application already shows the clues, instructions, hints, and answer submission UI; this HTML is supplemental presentation only\n` +
+      `- MUST visually reinforce the same puzzle logic and clues from the concept above\n` +
+      `- MUST NOT introduce any new rules, hidden clues, or required knowledge that are absent from the concept\n` +
+      `- You MAY include internal interactive controls, but they are optional because the host owns answer submission\n` +
+      `- If the HTML includes an internal solved state, it MUST call: window.parent.postMessage({type:"PUZZLE_SOLVED",puzzleId:"${concept.id}"},"*") exactly once when solved\n` +
       `- Must be solvable without outside knowledge and without inventing extra hidden rules\n` +
       `- No localStorage, sessionStorage, or cookies\n` +
       `- No alert() or confirm()\n` +
       `- Show a clear visual success state when solved\n` +
       `- ABSOLUTELY NO <img> tags, no <image> tags, no base64 data URIs, no SVG images — text and CSS only\n` +
       `- Do NOT embed any binary data or base64 encoded content of any kind\n` +
-      `- Keep the HTML under 200 lines total\n\n` +
+      `- Keep the HTML under 240 lines total\n\n` +
       `Output ONLY the raw HTML. No JSON wrapper, no markdown fences, no explanation.`;
 
     return this.callPuzzle(prompt, {
@@ -735,13 +785,21 @@ export class LlmService {
         puzzleLabel: concept.label,
       },
     }).pipe(
-      map((raw) => this.stripHtmlFences(raw)),
+      map((raw) => this.coercePuzzleHtml(raw, concept, theme)),
       map(
         (html): PuzzleEvent => ({
           id: concept.id,
           type: concept.puzzleType,
           title: concept.puzzleTitle,
           description: concept.puzzleDescription,
+          interactionInstructions: concept.interactionInstructions,
+          visibleClues: concept.clues,
+          answerPrompt: concept.answerPrompt,
+          answerPlaceholder: concept.answerPlaceholder,
+          answerFormat: concept.answerFormat,
+          acceptableAnswers: concept.acceptableAnswers,
+          validationLogic: concept.validationLogic,
+          uiConcept: concept.uiConcept,
           htmlComponent: html,
           solutionCondition: concept.solution,
           rewardedClueId: concept.rewardedClueId,
@@ -894,7 +952,7 @@ export class LlmService {
     // Resolve puzzleLabel â†’ puzzleId for event graph
     const labelToId = new Map(ctx.puzzleConcepts.map((concept) => [concept.label, concept.id]));
 
-    const eventGraph: InvestigationEvent[] = ctx.events.map((e) => ({
+    const rawEventGraph: InvestigationEvent[] = ctx.events.map((e) => ({
       id: e.id,
       category: e.category,
       type: e.type,
@@ -909,6 +967,9 @@ export class LlmService {
       dialogueSuspectId: e.dialogueSuspectId ?? undefined,
       narration: e.narration,
     }));
+
+    // Repair any silent deadlocks before storing the case.
+    const eventGraph = repairEventGraph(rawEventGraph);
 
     // Derive cluesFoundHere for each location (invert clue.locationId)
     const cluesByLocation = new Map<string, string[]>();
@@ -1082,5 +1143,88 @@ export class LlmService {
 
     // 3. Fallback — return trimmed raw text as-is
     return raw.trim();
+  }
+
+  private coercePuzzleHtml(raw: string, concept: PuzzleConcept, theme: UITheme): string {
+    const html = this.stripHtmlFences(raw);
+    const isDocumentLike = /<!DOCTYPE html>|<html[\s>]/i.test(html);
+    const hasForbiddenApis =
+      /localStorage|sessionStorage|document\.cookie|<script[^>]+src=|<link[^>]+href=/i.test(html);
+
+    if (!html || !isDocumentLike || hasForbiddenApis) {
+      return this.buildPuzzleFallbackHtml(concept, theme);
+    }
+
+    return html;
+  }
+
+  private buildPuzzleFallbackHtml(concept: PuzzleConcept, theme: UITheme): string {
+    const clueItems = concept.clues.map((clue) => `<li>${this.escapeHtml(clue)}</li>`).join('');
+
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${this.escapeHtml(concept.puzzleTitle)}</title>
+  <style>
+    :root {
+      color-scheme: dark;
+    }
+    body {
+      margin: 0;
+      font-family: Georgia, serif;
+      background: ${theme.primaryColor};
+      color: ${theme.textColor};
+      padding: 24px;
+    }
+    .panel {
+      max-width: 720px;
+      margin: 0 auto;
+      background: ${theme.secondaryColor};
+      border: 1px solid ${theme.accentColor};
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.3);
+    }
+    h1 {
+      margin: 0 0 8px;
+      color: ${theme.accentColor};
+      font-size: 1.4rem;
+    }
+    p, li {
+      line-height: 1.5;
+    }
+    ul {
+      margin: 12px 0 0;
+      padding-left: 20px;
+    }
+    .note {
+      margin-top: 16px;
+      padding: 12px;
+      border-radius: 12px;
+      background: ${theme.surfaceColor};
+    }
+  </style>
+</head>
+<body>
+  <section class="panel">
+    <h1>${this.escapeHtml(concept.puzzleTitle)}</h1>
+    <p>${this.escapeHtml(concept.puzzleDescription)}</p>
+    <p>${this.escapeHtml(concept.interactionInstructions)}</p>
+    <ul>${clueItems}</ul>
+    <div class="note">Use the case file panel outside this exhibit to submit your answer.</div>
+  </section>
+</body>
+</html>`;
+  }
+
+  private escapeHtml(value: string): string {
+    return value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
   }
 }

@@ -321,7 +321,9 @@ The old approach asked a single model call to produce ~800–2000 tokens of stru
 
 ### Step 7 — Puzzle Concepts
 
-**Purpose:** Generate puzzle concepts with no HTML. Each concept defines the player-facing setup, the underlying logic, the clues, the intended solution, and the validation rule. HTML generation is a separate sub-step (Step 7b). This separation is critical: the first call proves the puzzle works logically, and the second call only needs to render that validated concept.
+**Purpose:** Generate puzzle concepts with no HTML. Each concept defines the player-facing setup, the underlying logic, the clues, the intended solution, the answer format, and the validation rule. HTML generation is a separate sub-step (Step 7b). This separation is critical: the first call proves the puzzle works logically, and the second call only needs to render that validated concept.
+
+**Runtime note:** The Angular host now renders the puzzle's instructions, visible clues, answer prompt, accepted answers, and validation flow from this structured concept data. The iframe HTML is supplemental presentation, not the sole source of puzzle information.
 
 **Required inputs:**
 - `EventGraphResult` from Step 6 (for `puzzleLabel` references)
@@ -379,7 +381,7 @@ The old approach asked a single model call to produce ~800–2000 tokens of stru
 
 ### Step 7b — Puzzle HTML Generation (sub-step, one call per puzzle)
 
-**Purpose:** Generate the self-contained HTML component for a single puzzle. This is a separate call per puzzle to keep the output small and to allow targeted regeneration if the HTML is broken.
+**Purpose:** Generate the self-contained HTML component for a single puzzle. This is a separate call per puzzle to keep the output small and to allow targeted regeneration if the HTML is broken. The HTML may be interactive, but it is no longer the authoritative solve path.
 
 **Required inputs:**
 - Single `PuzzleConcept` from Step 7
@@ -391,12 +393,13 @@ The old approach asked a single model call to produce ~800–2000 tokens of stru
 
 **Backend validation after step:**
 - Valid HTML (parseable by DOMParser)
-- Contains exactly one `window.parent.postMessage` call
-- postMessage payload matches `{type:'PUZZLE_SOLVED', puzzleId:'<exact-id>'}`
+- If the iframe includes an internal solved state, it contains exactly one `window.parent.postMessage` call
+- If present, postMessage payload matches `{type:'PUZZLE_SOLVED', puzzleId:'<exact-id>'}`
 - No `allow-same-origin` policy violations
 - No `localStorage`, `sessionStorage`, `document.cookie` access
 - No external `<script src="">` or `<link href="">` tags
 - HTML length under 12,000 characters
+- HTML does not introduce clues or rules that are absent from the structured puzzle concept
 
 **Can be retried independently:** Yes — retry only this puzzle's HTML
 

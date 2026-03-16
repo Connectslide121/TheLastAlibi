@@ -5,6 +5,7 @@ import { DebugTraceService } from '../../services/debug-trace.service';
 import { GameStateService } from '../../services/game-state.service';
 import { ThemeService } from '../../services/theme.service';
 import { ImageService } from '../../services/image.service';
+import { repairEventGraph } from '../../utils/event-graph-repair';
 import {
   SuspectCardComponent,
   ClueCardComponent,
@@ -140,7 +141,7 @@ type UnlockSpotlight = { kind: 'clue'; clue: Clue } | { kind: 'suspect'; suspect
             Suspects ({{ unlockedSuspects().length }})
           </div>
           @if (unlockedSuspects().length === 0) {
-            <p class="text-xs text-(--color-text-muted) italic">No suspects unlocked yet.</p>
+            <p class="text-xs text-(--color-text-muted) italic">No suspects in this case.</p>
           }
           @for (suspect of unlockedSuspects(); track suspect.id) {
             <app-suspect-card
@@ -249,40 +250,99 @@ type UnlockSpotlight = { kind: 'clue'; clue: Clue } | { kind: 'suspect'; suspect
             <h2 class="font-heading text-xl text-(--color-accent) mb-4">
               What would you like to investigate?
             </h2>
-            @if (availableEvents().length === 0) {
+            @if (currentActEvents().length === 0 && lingeringEvents().length === 0) {
               <p class="text-(--color-text-muted) italic mb-4">
                 No leads available right now. Continue investigating to unlock more.
               </p>
             }
-            <div class="grid grid-cols-1 gap-4 max-w-2xl">
-              @for (event of availableEvents(); track event.id) {
-                <button
-                  type="button"
-                  (click)="selectEvent(event)"
-                  class="text-left p-4 rounded-lg border cursor-pointer transition-all hover:scale-[1.01] hover:opacity-90"
-                  style="background: var(--color-secondary); border-color: rgba(201,168,76,0.3);"
+            @if (currentActEvents().length > 0) {
+              <div class="max-w-2xl mb-6">
+                <p
+                  class="font-mono text-xs uppercase tracking-widest mb-3"
+                  style="color: var(--color-text-muted)"
                 >
-                  <div class="flex items-start gap-3">
-                    <span class="material-icons mi-lg text-(--color-accent) opacity-70">{{
-                      categoryIcon(event.category)
-                    }}</span>
-                    <div class="flex-1">
-                      <h3 class="font-heading text-(--color-accent) mb-0.5">{{ event.title }}</h3>
-                      <p class="text-sm text-(--color-text) opacity-80">{{ event.description }}</p>
-                      @if (event.isMandatory) {
-                        <span
-                          class="inline-flex items-center gap-1 mt-1.5 px-2 py-0.5 text-xs font-mono rounded"
-                          style="border: 1px solid rgba(251,191,36,0.5); color: rgb(251,191,36);"
-                        >
-                          <span class="material-icons mi-sm">star</span>
-                          Required
-                        </span>
-                      }
-                    </div>
-                  </div>
-                </button>
-              }
-            </div>
+                  Current Act Leads
+                </p>
+                <div class="grid grid-cols-1 gap-4">
+                  @for (event of currentActEvents(); track event.id) {
+                    <button
+                      type="button"
+                      (click)="selectEvent(event)"
+                      class="text-left p-4 rounded-lg border cursor-pointer transition-all hover:scale-[1.01] hover:opacity-90"
+                      style="background: var(--color-secondary); border-color: rgba(201,168,76,0.3);"
+                    >
+                      <div class="flex items-start gap-3">
+                        <span class="material-icons mi-lg text-(--color-accent) opacity-70">{{
+                          categoryIcon(event.category)
+                        }}</span>
+                        <div class="flex-1">
+                          <div class="flex items-center gap-2 flex-wrap">
+                            <h3 class="font-heading text-(--color-accent) mb-0.5">
+                              {{ event.title }}
+                            </h3>
+                            @if (event.isMandatory) {
+                              <span
+                                class="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-mono rounded"
+                                style="border: 1px solid rgba(251,191,36,0.5); color: rgb(251,191,36);"
+                              >
+                                <span class="material-icons mi-sm">star</span>
+                                Required
+                              </span>
+                            }
+                          </div>
+                          <p class="text-sm text-(--color-text) opacity-80">
+                            {{ event.description }}
+                          </p>
+                        </div>
+                      </div>
+                    </button>
+                  }
+                </div>
+              </div>
+            }
+
+            @if (lingeringEvents().length > 0) {
+              <div class="max-w-2xl">
+                <p
+                  class="font-mono text-xs uppercase tracking-widest mb-3"
+                  style="color: var(--color-text-muted)"
+                >
+                  Open Leads From Earlier Acts
+                </p>
+                <div class="grid grid-cols-1 gap-4">
+                  @for (event of lingeringEvents(); track event.id) {
+                    <button
+                      type="button"
+                      (click)="selectEvent(event)"
+                      class="text-left p-4 rounded-lg border cursor-pointer transition-all hover:scale-[1.01] hover:opacity-90"
+                      style="background: var(--color-secondary); border-color: rgba(201,168,76,0.22);"
+                    >
+                      <div class="flex items-start gap-3">
+                        <span class="material-icons mi-lg text-(--color-accent) opacity-60">{{
+                          categoryIcon(event.category)
+                        }}</span>
+                        <div class="flex-1">
+                          <div class="flex items-center gap-2 flex-wrap">
+                            <h3 class="font-heading text-(--color-accent) mb-0.5">
+                              {{ event.title }}
+                            </h3>
+                            <span
+                              class="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-mono rounded"
+                              style="background: rgba(201,168,76,0.12); color: var(--color-text-muted)"
+                            >
+                              Act {{ event.act }}
+                            </span>
+                          </div>
+                          <p class="text-sm text-(--color-text) opacity-80">
+                            {{ event.description }}
+                          </p>
+                        </div>
+                      </div>
+                    </button>
+                  }
+                </div>
+              </div>
+            }
 
             <!-- Accusation Button -->
             @if (isAccusationUnlocked()) {
@@ -437,7 +497,7 @@ type UnlockSpotlight = { kind: 'clue'; clue: Clue } | { kind: 'suspect'; suspect
                 <div class="grid grid-cols-1 md:grid-cols-[220px_1fr] gap-5 items-start">
                   <app-clue-card
                     [clue]="currentSpotlightClue()!"
-                    [showTruth]="true"
+                    [showTruth]="false"
                     [variant]="'preview'"
                   />
                   <div class="flex flex-col gap-4">
@@ -509,18 +569,15 @@ type UnlockSpotlight = { kind: 'clue'; clue: Clue } | { kind: 'suspect'; suspect
         </div>
       }
 
-      <!-- ===== Case File Drawer ===== -->
+      <!-- ===== Case File Modal ===== -->
       @if (caseFileOpen()) {
-        <!-- Backdrop -->
         <div class="fixed inset-0 z-60 bg-black/60" (click)="caseFileOpen.set(false)"></div>
 
-        <!-- Drawer panel -->
         <div
-          class="fixed right-0 top-0 bottom-0 z-70 w-full max-w-lg flex flex-col"
-          style="background: var(--color-secondary); border-left: var(--border-style); animation: drawerIn 0.25s ease both"
+          class="fixed inset-3 md:inset-6 z-70 flex flex-col rounded-xl overflow-hidden"
+          style="background: var(--color-secondary); border: var(--border-style); box-shadow: var(--shadow-style); animation: fadeIn 0.22s ease both"
           (click)="$event.stopPropagation()"
         >
-          <!-- Drawer header -->
           <div
             class="flex items-center gap-3 px-5 py-4 shrink-0"
             style="border-bottom: var(--border-style)"
@@ -539,7 +596,6 @@ type UnlockSpotlight = { kind: 'clue'; clue: Clue } | { kind: 'suspect'; suspect
             </button>
           </div>
 
-          <!-- Tabs -->
           <div class="flex shrink-0 px-5 gap-1 pt-3" style="border-bottom: var(--border-style)">
             @for (tab of caseFileTabs(); track tab.id) {
               <button
@@ -559,14 +615,16 @@ type UnlockSpotlight = { kind: 'clue'; clue: Clue } | { kind: 'suspect'; suspect
             }
           </div>
 
-          <!-- Tab content -->
           <div class="flex-1 overflow-y-auto p-5 flex flex-col gap-5">
             <!-- BRIEFING TAB -->
             @if (caseFileTab() === 'briefing') {
               <div class="flex flex-col gap-5">
                 <!-- Hero / briefing image -->
                 @if (casePackage()?.briefingImageUrl) {
-                  <div class="w-full rounded-lg overflow-hidden" style="aspect-ratio: 3/2">
+                  <div
+                    class="w-full max-w-3xl mx-auto rounded-lg overflow-hidden"
+                    style="aspect-ratio: 16/9"
+                  >
                     <img
                       [src]="casePackage()!.briefingImageUrl"
                       [alt]="casePackage()?.metadata?.title"
@@ -615,15 +673,14 @@ type UnlockSpotlight = { kind: 'clue'; clue: Clue } | { kind: 'suspect'; suspect
                     {{ casePackage()?.metadata?.briefing }}
                   </p>
                 </div>
-                <!-- Acts — only acts the player has reached are shown (no spoilers) -->
-                <div class="flex flex-col gap-4">
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
                   @for (act of briefingActPreviews(); track act.label) {
                     <div
                       class="rounded-lg overflow-hidden"
                       style="background: var(--color-surface); border: var(--border-style)"
                     >
                       @if (act.imageUrl) {
-                        <div class="w-full" style="aspect-ratio: 16/7">
+                        <div class="w-full" style="aspect-ratio: 16/9">
                           <img
                             [src]="act.imageUrl"
                             [alt]="act.label"
@@ -845,7 +902,7 @@ type UnlockSpotlight = { kind: 'clue'; clue: Clue } | { kind: 'suspect'; suspect
                       No clues logged yet.
                     </p>
                   }
-                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div class="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3">
                     @for (clue of archiveClues(); track clue.id) {
                       <button
                         type="button"
@@ -870,7 +927,7 @@ type UnlockSpotlight = { kind: 'clue'; clue: Clue } | { kind: 'suspect'; suspect
                       No suspects logged yet.
                     </p>
                   }
-                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div class="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3">
                     @for (suspect of archiveSuspects(); track suspect.id) {
                       <app-suspect-card
                         [suspect]="suspect"
@@ -902,14 +959,13 @@ type UnlockSpotlight = { kind: 'clue'; clue: Clue } | { kind: 'suspect'; suspect
                     class="text-sm leading-relaxed"
                     style="font-family: var(--font-body); color: var(--color-text)"
                   >
-                    Locations are revealed as you make progress. Clue counts update as you uncover
-                    evidence.
+                    All case locations are listed here. Clue counts update as you uncover evidence.
                   </p>
                 </div>
 
                 @if (locationsByAct().length === 0) {
                   <p class="text-sm italic" style="color: var(--color-text-muted)">
-                    No locations discovered yet. Complete events to uncover crime scenes.
+                    No locations in this case.
                   </p>
                 }
 
@@ -922,21 +978,15 @@ type UnlockSpotlight = { kind: 'clue'; clue: Clue } | { kind: 'suspect'; suspect
                       <span class="material-icons" style="font-size: 0.9rem">bookmark</span>
                       Act {{ group.act }}
                     </h3>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div
+                      class="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3"
+                    >
                       @for (entry of group.locations; track entry.location.id) {
-                        <div class="flex flex-col gap-1">
-                          <app-location-card
-                            [location]="entry.location"
-                            [isVisited]="entry.cluesFound > 0"
-                            (cardClicked)="caseFileTab.set('archive')"
-                          />
-                          <p
-                            class="font-mono text-[10px] text-center"
-                            style="color: var(--color-text-muted)"
-                          >
-                            {{ entry.cluesFound }} / {{ entry.cluesTotal }} clues found
-                          </p>
-                        </div>
+                        <app-location-card
+                          [location]="entry.location"
+                          [isVisited]="entry.cluesFound > 0"
+                          (cardClicked)="onLocationClicked($event)"
+                        />
                       }
                     </div>
                   </div>
@@ -1141,19 +1191,111 @@ type UnlockSpotlight = { kind: 'clue'; clue: Clue } | { kind: 'suspect'; suspect
         </div>
       }
 
+      <!-- ===== Location Detail Modal ===== -->
+      @if (expandedLocation()) {
+        <div
+          class="fixed inset-0 z-80 flex items-center justify-center p-4"
+          style="background: rgba(0,0,0,0.85)"
+          (click)="expandedLocation.set(null)"
+        >
+          <div
+            class="relative w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-lg flex flex-col"
+            style="background: var(--color-secondary); border: var(--border-style); animation: fadeIn 0.2s ease both"
+            (click)="$event.stopPropagation()"
+          >
+            <button
+              type="button"
+              (click)="expandedLocation.set(null)"
+              class="absolute top-3 right-3 z-10 p-1.5 rounded-full opacity-60 hover:opacity-100 cursor-pointer transition-opacity"
+              style="background: var(--color-surface)"
+            >
+              <span class="material-icons mi-md" style="color: var(--color-text)">close</span>
+            </button>
+            <div
+              class="w-full overflow-hidden rounded-t-lg"
+              style="aspect-ratio: 16/9; background: var(--color-surface)"
+            >
+              @if (expandedLocation()!.imageUrl) {
+                <img
+                  [src]="expandedLocation()!.imageUrl"
+                  [alt]="expandedLocation()!.name"
+                  class="w-full h-full object-cover"
+                />
+              } @else {
+                <div class="w-full h-full flex items-center justify-center opacity-20">
+                  <span class="material-icons" style="font-size: 5rem; color: var(--color-text)"
+                    >location_city</span
+                  >
+                </div>
+              }
+            </div>
+            <div class="p-6 flex flex-col gap-4">
+              <div class="flex items-center gap-2">
+                <span class="material-icons mi-md" style="color: var(--color-accent)"
+                  >location_on</span
+                >
+                <h2 class="font-heading text-2xl" style="color: var(--color-accent)">
+                  {{ expandedLocation()!.name }}
+                </h2>
+              </div>
+              <p
+                class="text-base leading-relaxed"
+                style="font-family: var(--font-body); color: var(--color-text)"
+              >
+                {{ expandedLocation()!.description }}
+              </p>
+              <div
+                class="rounded p-4 flex flex-col gap-2"
+                style="background: var(--color-surface); border: var(--border-style)"
+              >
+                <span
+                  class="font-mono text-xs uppercase tracking-widest flex items-center gap-1.5"
+                  style="color: var(--color-accent)"
+                >
+                  <span class="material-icons" style="font-size: 0.9rem">wb_twilight</span>
+                  Atmosphere
+                </span>
+                <p
+                  class="text-sm leading-relaxed italic"
+                  style="font-family: var(--font-body); color: var(--color-text)"
+                >
+                  {{ expandedLocation()!.atmosphere }}
+                </p>
+              </div>
+              <div>
+                <p
+                  class="font-mono text-xs uppercase tracking-widest mb-2"
+                  style="color: var(--color-text-muted)"
+                >
+                  Clues Found Here
+                </p>
+                @if (expandedLocation()!.cluesFoundHere.length === 0) {
+                  <p class="text-sm italic" style="color: var(--color-text-muted)">
+                    No logged clues at this location yet.
+                  </p>
+                } @else {
+                  <div class="flex flex-wrap gap-2">
+                    @for (clueId of expandedLocation()!.cluesFoundHere; track clueId) {
+                      <span
+                        class="px-2 py-1 rounded font-mono text-xs"
+                        style="background: rgba(201,168,76,0.12); color: var(--color-text)"
+                      >
+                        {{ clueName(clueId) }}
+                      </span>
+                    }
+                  </div>
+                }
+              </div>
+            </div>
+          </div>
+        </div>
+      }
+
       @if (debugDashboardOpen() && casePackage(); as pkg) {
         <app-debug-dashboard [casePackage]="pkg" (closeRequested)="debugDashboardOpen.set(false)" />
       }
 
       <style>
-        @keyframes drawerIn {
-          from {
-            transform: translateX(100%);
-          }
-          to {
-            transform: translateX(0);
-          }
-        }
         @keyframes fadeIn {
           from {
             opacity: 0;
@@ -1205,6 +1347,7 @@ export class InvestigationView implements OnInit {
   readonly caseFileTab = signal<'briefing' | 'timeline' | 'archive' | 'locations'>('briefing');
   readonly expandedSuspect = signal<Suspect | null>(null);
   readonly expandedClue = signal<Clue | null>(null);
+  readonly expandedLocation = signal<GameLocation | null>(null);
   readonly replayingEventId = signal<string | null>(null);
   readonly unlockSpotlight = signal<UnlockSpotlight | null>(null);
   readonly debugDashboardOpen = signal(false);
@@ -1218,14 +1361,29 @@ export class InvestigationView implements OnInit {
     const pkg = this.casePackage();
     const state = this.gameState();
     if (!pkg || !state) return [];
-    return this.gsvc.getAvailableEvents(pkg, state);
+    return this.gsvc
+      .getAvailableEvents(pkg, state)
+      .slice()
+      .sort((a, b) => {
+        const actDelta = b.act - a.act;
+        if (actDelta !== 0) return actDelta;
+        if (a.isMandatory !== b.isMandatory) return a.isMandatory ? -1 : 1;
+        return a.title.localeCompare(b.title);
+      });
+  });
+
+  readonly currentActEvents = computed(() => {
+    const currentAct = this.gameState()?.currentAct ?? 1;
+    return this.availableEvents().filter((event) => event.act === currentAct);
+  });
+
+  readonly lingeringEvents = computed(() => {
+    const currentAct = this.gameState()?.currentAct ?? 1;
+    return this.availableEvents().filter((event) => event.act < currentAct);
   });
 
   readonly unlockedSuspects = computed((): Suspect[] => {
-    const pkg = this.casePackage();
-    const state = this.gameState();
-    if (!pkg || !state) return [];
-    return pkg.suspects.filter((s) => state.unlockedSuspectIds.includes(s.id));
+    return this.casePackage()?.suspects ?? [];
   });
 
   readonly foundClues = computed((): Clue[] => {
@@ -1283,10 +1441,7 @@ export class InvestigationView implements OnInit {
   });
 
   readonly archiveSuspects = computed((): Suspect[] => {
-    const pkg = this.casePackage();
-    const state = this.gameState();
-    if (!pkg || !state) return [];
-    return pkg.suspects.filter((suspect) => state.unlockedSuspectIds.includes(suspect.id));
+    return this.casePackage()?.suspects ?? [];
   });
 
   readonly currentSpotlightClue = computed((): Clue | null => {
@@ -1345,7 +1500,6 @@ export class InvestigationView implements OnInit {
     const state = this.gameState();
     if (!pkg || !state) return [];
 
-    const completedIds = new Set(state.completedEventIds);
     const foundClueIds = new Set(state.foundClueIds);
 
     const actGroups = new Map<
@@ -1357,13 +1511,7 @@ export class InvestigationView implements OnInit {
       const clueIdSet = new Set(cluesHere.map((c) => c.id));
       const events = pkg.eventGraph.filter((e) => e.rewardsClueIds.some((id) => clueIdSet.has(id)));
 
-      // A location is revealed once any event rewarding one of its clues has been completed,
-      // or (fallback) if a clue physically at this location has been found.
-      const isRevealed =
-        events.some((e) => completedIds.has(e.id)) || cluesHere.some((c) => foundClueIds.has(c.id));
-
-      if (!isRevealed) continue;
-
+      // Assign to the act of the earliest relevant event; default to act 1.
       const act: number = events.length > 0 ? Math.min(...events.map((e) => e.act)) : 1;
       const cluesFound = cluesHere.filter((c) => foundClueIds.has(c.id)).length;
       if (!actGroups.has(act)) actGroups.set(act, []);
@@ -1380,13 +1528,11 @@ export class InvestigationView implements OnInit {
     const pkg = this.casePackage();
     const currentAct = this.gameState()?.currentAct ?? 1;
     if (!m || !pkg) return [];
-    const all = [
+    return [
       { label: 'Act I', summary: m.act1Summary, imageUrl: pkg.act1ImageUrl },
       { label: 'Act II', summary: m.act2Summary, imageUrl: pkg.act2ImageUrl },
       { label: 'Act III', summary: m.act3Summary, imageUrl: pkg.act3ImageUrl },
-    ];
-    // Only show acts the player has already reached — no spoilers
-    return all.slice(0, currentAct);
+    ].slice(0, currentAct);
   });
 
   readonly visibleTimelineEvents = computed(() => {
@@ -1408,6 +1554,10 @@ export class InvestigationView implements OnInit {
 
   clueLocationName(locationId: string): string {
     return this.casePackage()?.locations.find((l) => l.id === locationId)?.name ?? locationId;
+  }
+
+  clueName(clueId: string): string {
+    return this.casePackage()?.clues.find((clue) => clue.id === clueId)?.name ?? clueId;
   }
 
   suspectName(suspectId: string | undefined): string {
@@ -1443,9 +1593,16 @@ export class InvestigationView implements OnInit {
       this.caseStore
         .loadDebugTrace(sessionId)
         .subscribe((trace) => this.debugTrace.loadSnapshot(trace));
-      this.casePackage.set(pkg);
-      this.theme.applyTheme(pkg.uiTheme);
-      this.theme.applyTexture(pkg.uiTheme.textureFamily);
+
+      // Retroactively repair any deadlocked event graph from older saves.
+      const repairedPkg: CasePackage = {
+        ...pkg,
+        eventGraph: repairEventGraph(pkg.eventGraph),
+      };
+
+      this.casePackage.set(repairedPkg);
+      this.theme.applyTheme(repairedPkg.uiTheme);
+      this.theme.applyTexture(repairedPkg.uiTheme.textureFamily);
       this.isLoading.set(false);
 
       // Show Act I banner on fresh start (no events completed yet)
@@ -1453,12 +1610,12 @@ export class InvestigationView implements OnInit {
       if (state && state.currentAct === 1 && state.completedEventIds.length === 0) {
         this.currentActForBanner.set(1);
         this.actBannerTitle.set('Act I: The Investigation Begins');
-        this.actBannerSummary.set(pkg.metadata.act1Summary);
+        this.actBannerSummary.set(repairedPkg.metadata.act1Summary);
         this.showActBanner.set(true);
       }
 
       // Re-hydrate blob object URLs from the IndexedDB image cache (they don't survive page refresh)
-      this.imageService.generateAllCaseImages(pkg).subscribe({
+      this.imageService.generateAllCaseImages(repairedPkg).subscribe({
         next: (updated) => this.casePackage.set(updated),
       });
     });
@@ -1505,9 +1662,11 @@ export class InvestigationView implements OnInit {
 
   onPuzzleSolved(clueId: string): void {
     const event = this.selectedEvent();
+    const puzzle = this.activePuzzle();
     if (event) {
       if (!this.isReplayingEvent(event.id)) {
-        if (clueId) this.gsvc.discoverClue(clueId);
+        if (puzzle) this.gsvc.completePuzzle(puzzle.id);
+        if (clueId && !event.rewardsClueIds.includes(clueId)) this.gsvc.discoverClue(clueId);
         this.completeCurrentEvent(event);
       }
     }
@@ -1549,6 +1708,10 @@ export class InvestigationView implements OnInit {
 
   onClueClicked(clue: Clue): void {
     this.expandedClue.set(clue);
+  }
+
+  onLocationClicked(location: GameLocation): void {
+    this.expandedLocation.set(location);
   }
 
   useHint(): void {

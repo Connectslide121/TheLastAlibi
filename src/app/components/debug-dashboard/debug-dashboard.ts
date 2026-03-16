@@ -9,7 +9,7 @@ import {
 } from '@angular/core';
 import { DatePipe } from '@angular/common';
 
-import { CasePackage, Clue } from '../../models';
+import { CasePackage, Clue, PuzzleEvent } from '../../models';
 import {
   DebugAiRequestRecord,
   DebugImageRecord,
@@ -1166,7 +1166,27 @@ type RequestStatusTone = {
                         row of [
                           { label: 'ID', value: puzzle.id },
                           { label: 'Description', value: puzzle.description },
+                          {
+                            label: 'Interaction Instructions',
+                            value: puzzleInteractionInstructions(puzzle),
+                          },
+                          {
+                            label: 'Answer Prompt',
+                            value: puzzleAnswerPrompt(puzzle),
+                          },
+                          {
+                            label: 'Answer Format',
+                            value: puzzleAnswerFormat(puzzle),
+                          },
                           { label: 'Solution Condition', value: puzzle.solutionCondition },
+                          {
+                            label: 'Validation Logic',
+                            value: puzzleValidationLogic(puzzle),
+                          },
+                          {
+                            label: 'UI Concept',
+                            value: puzzleUiConcept(puzzle),
+                          },
                           { label: 'Rewarded Clue ID', value: puzzle.rewardedClueId },
                         ];
                         track row.label
@@ -1186,6 +1206,34 @@ type RequestStatusTone = {
                           </p>
                         </div>
                       }
+                      <div>
+                        <p
+                          class="font-mono text-[10px] uppercase tracking-widest mb-1"
+                          style="color: var(--color-text-muted)"
+                        >
+                          Visible Clues
+                        </p>
+                        <ul class="flex flex-col gap-1 list-disc pl-4">
+                          @for (clue of puzzleVisibleClues(puzzle); track $index) {
+                            <li class="text-sm" style="color: var(--color-text)">{{ clue }}</li>
+                          }
+                        </ul>
+                      </div>
+                      <div>
+                        <p
+                          class="font-mono text-[10px] uppercase tracking-widest mb-1"
+                          style="color: var(--color-text-muted)"
+                        >
+                          Acceptable Answers
+                        </p>
+                        <ul class="flex flex-col gap-1 list-disc pl-4">
+                          @for (answer of puzzleAcceptableAnswers(puzzle); track answer) {
+                            <li class="text-sm font-mono" style="color: var(--color-text)">
+                              {{ answer }}
+                            </li>
+                          }
+                        </ul>
+                      </div>
                       @if (puzzle.hints.length) {
                         <div>
                           <p
@@ -1296,6 +1344,61 @@ type RequestStatusTone = {
                             </p>
                             <p style="color: var(--color-text)">{{ puzzle.description }}</p>
                           </div>
+                          <div>
+                            <p
+                              class="font-mono text-[10px] uppercase tracking-widest mb-0.5"
+                              style="color: var(--color-text-muted)"
+                            >
+                              Interaction Instructions
+                            </p>
+                            <p style="color: var(--color-text)">
+                              {{ puzzleInteractionInstructions(puzzle) }}
+                            </p>
+                          </div>
+                          <div>
+                            <p
+                              class="font-mono text-[10px] uppercase tracking-widest mb-1"
+                              style="color: var(--color-text-muted)"
+                            >
+                              Visible Clues
+                            </p>
+                            <ul class="flex flex-col gap-1 list-disc pl-4">
+                              @for (clue of puzzleVisibleClues(puzzle); track $index) {
+                                <li style="color: var(--color-text)">{{ clue }}</li>
+                              }
+                            </ul>
+                          </div>
+                          <div>
+                            <p
+                              class="font-mono text-[10px] uppercase tracking-widest mb-0.5"
+                              style="color: var(--color-text-muted)"
+                            >
+                              Answer Prompt
+                            </p>
+                            <p style="color: var(--color-text)">
+                              {{ puzzleAnswerPrompt(puzzle) }}
+                            </p>
+                            <p class="text-xs mt-1" style="color: var(--color-text-muted)">
+                              Placeholder:
+                              {{ puzzleAnswerPlaceholder(puzzle) }}
+                            </p>
+                            <p class="text-xs mt-1" style="color: var(--color-text-muted)">
+                              Format: {{ puzzleAnswerFormat(puzzle) }}
+                            </p>
+                          </div>
+                          <div>
+                            <p
+                              class="font-mono text-[10px] uppercase tracking-widest mb-1"
+                              style="color: var(--color-text-muted)"
+                            >
+                              Acceptable Answers
+                            </p>
+                            <ul class="flex flex-col gap-1 list-disc pl-4">
+                              @for (answer of puzzleAcceptableAnswers(puzzle); track answer) {
+                                <li style="color: var(--color-text)">{{ answer }}</li>
+                              }
+                            </ul>
+                          </div>
                           @if (puzzle.hints.length) {
                             <div>
                               <p
@@ -1319,6 +1422,28 @@ type RequestStatusTone = {
                               Solution Condition
                             </p>
                             <p style="color: var(--color-text)">{{ puzzle.solutionCondition }}</p>
+                          </div>
+                          <div>
+                            <p
+                              class="font-mono text-[10px] uppercase tracking-widest mb-0.5"
+                              style="color: var(--color-text-muted)"
+                            >
+                              Validation Logic
+                            </p>
+                            <p style="color: var(--color-text)">
+                              {{ puzzleValidationLogic(puzzle) }}
+                            </p>
+                          </div>
+                          <div>
+                            <p
+                              class="font-mono text-[10px] uppercase tracking-widest mb-0.5"
+                              style="color: var(--color-text-muted)"
+                            >
+                              UI Concept
+                            </p>
+                            <p style="color: var(--color-text)">
+                              {{ puzzleUiConcept(puzzle) }}
+                            </p>
                           </div>
                           @if (entry.rewardClue) {
                             <div>
@@ -1909,6 +2034,48 @@ export class DebugDashboardComponent {
 
   protected snippet(value: string, maxLength: number): string {
     return value.length <= maxLength ? value : `${value.slice(0, maxLength)}...`;
+  }
+
+  protected puzzleInteractionInstructions(puzzle: PuzzleEvent): string {
+    return (
+      (puzzle as Partial<PuzzleEvent>).interactionInstructions ||
+      'No structured instructions stored.'
+    );
+  }
+
+  protected puzzleVisibleClues(puzzle: PuzzleEvent): string[] {
+    const clues = (puzzle as Partial<PuzzleEvent>).visibleClues;
+    return Array.isArray(clues) ? clues : [];
+  }
+
+  protected puzzleAnswerPrompt(puzzle: PuzzleEvent): string {
+    return (puzzle as Partial<PuzzleEvent>).answerPrompt || 'Submit your answer';
+  }
+
+  protected puzzleAnswerPlaceholder(puzzle: PuzzleEvent): string {
+    return (
+      (puzzle as Partial<PuzzleEvent>).answerPlaceholder ||
+      'Enter the answer exactly as the clues imply'
+    );
+  }
+
+  protected puzzleAnswerFormat(puzzle: PuzzleEvent): string {
+    return (puzzle as Partial<PuzzleEvent>).answerFormat || puzzle.solutionCondition;
+  }
+
+  protected puzzleAcceptableAnswers(puzzle: PuzzleEvent): string[] {
+    const answers = (puzzle as Partial<PuzzleEvent>).acceptableAnswers;
+    return Array.isArray(answers) ? answers : [];
+  }
+
+  protected puzzleValidationLogic(puzzle: PuzzleEvent): string {
+    return (
+      (puzzle as Partial<PuzzleEvent>).validationLogic || 'No explicit validation logic stored.'
+    );
+  }
+
+  protected puzzleUiConcept(puzzle: PuzzleEvent): string {
+    return (puzzle as Partial<PuzzleEvent>).uiConcept || 'No UI concept stored.';
   }
 
   protected statusBackground(image: DebugImageRecord): string {
