@@ -4,7 +4,13 @@ import { Router } from '@angular/router';
 import { CaseStoreService } from '../../services/case-store.service';
 import { GameStateService } from '../../services/game-state.service';
 import { ImageService } from '../../services/image.service';
-import { CasePackage, Suspect, Clue, EvidenceBoardNote, Location as GameLocation } from '../../models';
+import {
+  CasePackage,
+  Suspect,
+  Clue,
+  EvidenceBoardNote,
+  Location as GameLocation,
+} from '../../models';
 
 interface BoardCard {
   id: string;
@@ -177,7 +183,9 @@ const CARD_H = 130; // approx card height for midpoint calc
             <!-- Pin -->
             <div
               class="absolute -top-2.5 left-1/2 -translate-x-1/2 w-5 h-5 rounded-full flex items-center justify-center text-white text-xs shadow-md"
-              [style.background]="card.type === 'suspect' ? '#b91c1c' : card.type === 'clue' ? '#1d4ed8' : '#15803d'"
+              [style.background]="
+                card.type === 'suspect' ? '#b91c1c' : card.type === 'clue' ? '#1d4ed8' : '#15803d'
+              "
             >
               {{ card.type === 'suspect' ? '●' : card.type === 'clue' ? '◆' : '▲' }}
             </div>
@@ -453,7 +461,9 @@ const CARD_H = 130; // approx card height for midpoint calc
             </div>
             <div class="p-6 flex flex-col gap-4">
               <div class="flex items-center gap-2">
-                <span class="material-icons mi-md" style="color: var(--color-accent)">location_on</span>
+                <span class="material-icons mi-md" style="color: var(--color-accent)"
+                  >location_on</span
+                >
                 <h2 class="font-heading text-2xl" style="color: var(--color-accent)">
                   {{ expandedLocation()!.name }}
                 </h2>
@@ -484,7 +494,9 @@ const CARD_H = 130; // approx card height for midpoint calc
               </div>
               @if (expandedLocation()!.cluesFoundHere.length) {
                 <p class="font-mono text-xs" style="color: var(--color-text-muted)">
-                  <span class="material-icons" style="font-size: 0.8rem; vertical-align: middle">search</span>
+                  <span class="material-icons" style="font-size: 0.8rem; vertical-align: middle"
+                    >search</span
+                  >
                   {{ expandedLocation()!.cluesFoundHere.length }} clue(s) found here
                 </p>
               }
@@ -533,7 +545,9 @@ const CARD_H = 130; // approx card height for midpoint calc
             </div>
             <div class="p-6 flex flex-col gap-4">
               <div class="flex items-center gap-2">
-                <span class="material-icons mi-md" style="color: var(--color-accent)">location_on</span>
+                <span class="material-icons mi-md" style="color: var(--color-accent)"
+                  >location_on</span
+                >
                 <h2 class="font-heading text-2xl" style="color: var(--color-accent)">
                   {{ expandedLocation()!.name }}
                 </h2>
@@ -564,7 +578,9 @@ const CARD_H = 130; // approx card height for midpoint calc
               </div>
               @if (expandedLocation()!.cluesFoundHere.length) {
                 <p class="font-mono text-xs" style="color: var(--color-text-muted)">
-                  <span class="material-icons" style="font-size: 0.8rem; vertical-align: middle">search</span>
+                  <span class="material-icons" style="font-size: 0.8rem; vertical-align: middle"
+                    >search</span
+                  >
                   {{ expandedLocation()!.cluesFoundHere.length }} clue(s) found here
                 </p>
               }

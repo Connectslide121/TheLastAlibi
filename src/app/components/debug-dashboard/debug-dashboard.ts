@@ -18,7 +18,15 @@ import {
 import { PuzzleFrameComponent } from '../puzzle-frame/puzzle-frame';
 
 type DebugTab = 'requests' | 'images' | 'puzzles' | 'case-data';
-type CaseDataSection = 'metadata' | 'truth' | 'suspects' | 'locations' | 'clues' | 'events' | 'timeline' | 'puzzles-data';
+type CaseDataSection =
+  | 'metadata'
+  | 'truth'
+  | 'suspects'
+  | 'locations'
+  | 'clues'
+  | 'events'
+  | 'timeline'
+  | 'puzzles-data';
 
 type PuzzleDebugEntry = {
   puzzleId: string;
@@ -101,19 +109,20 @@ type RequestStatusTone = {
             [style.border-bottom-color]="activeTab() === tab.id ? 'transparent' : 'transparent'"
           >
             <span>{{ tab.label }}</span>
-            <span
-              class="inline-flex min-w-6 h-6 px-2 items-center justify-center rounded-full font-mono text-[10px]"
-              [style.background]="
-                activeTab() === tab.id ? 'rgba(201,168,76,0.16)' : 'rgba(0,0,0,0.22)'
-              "
-              [style.color]="
-                activeTab() === tab.id ? 'var(--color-accent)' : 'var(--color-text-muted)'
-              "
-            >
-              @if (tabCount(tab.id) !== null) {
-                {{ tabCount(tab.id) }}
-              }
-            </span>
+            @let count = tabCount(tab.id);
+            @if (count !== null) {
+              <span
+                class="inline-flex min-w-6 h-6 px-2 items-center justify-center rounded-full font-mono text-[10px]"
+                [style.background]="
+                  activeTab() === tab.id ? 'rgba(201,168,76,0.16)' : 'rgba(0,0,0,0.22)'
+                "
+                [style.color]="
+                  activeTab() === tab.id ? 'var(--color-accent)' : 'var(--color-text-muted)'
+                "
+              >
+                {{ count }}
+              </span>
+            }
           </button>
         }
       </div>
@@ -240,55 +249,98 @@ type RequestStatusTone = {
           <!-- Case Data Explorer -->
           <div class="h-full grid grid-cols-[14rem_minmax(0,1fr)] min-h-0">
             <!-- Section nav -->
-            <aside class="overflow-y-auto py-4 flex flex-col gap-1 px-3" style="border-right: var(--border-style)">
+            <aside
+              class="overflow-y-auto py-4 flex flex-col gap-1 px-3"
+              style="border-right: var(--border-style)"
+            >
               @for (sec of caseDataSections; track sec.id) {
                 <button
                   type="button"
                   (click)="caseDataSection.set(sec.id)"
                   class="w-full text-left px-3 py-2 rounded-lg text-sm cursor-pointer transition-opacity hover:opacity-85"
-                  [style.background]="caseDataSection() === sec.id ? 'rgba(201,168,76,0.12)' : 'transparent'"
-                  [style.color]="caseDataSection() === sec.id ? 'var(--color-accent)' : 'var(--color-text)'"
+                  [style.background]="
+                    caseDataSection() === sec.id ? 'rgba(201,168,76,0.12)' : 'transparent'
+                  "
+                  [style.color]="
+                    caseDataSection() === sec.id ? 'var(--color-accent)' : 'var(--color-text)'
+                  "
                 >
                   {{ sec.label }}
-                  <span class="font-mono text-[10px]" style="color: var(--color-text-muted)"> {{ sec.count() }}</span>
+                  <span class="font-mono text-[10px]" style="color: var(--color-text-muted)">
+                    {{ sec.count() }}</span
+                  >
                 </button>
               }
             </aside>
 
             <!-- Section content -->
             <div class="h-full min-h-0 overflow-y-auto px-6 py-5 flex flex-col gap-5">
-
               <!-- METADATA -->
               @if (caseDataSection() === 'metadata') {
                 @let m = casePackage().metadata;
-                <h3 class="font-heading text-xl" style="color: var(--color-accent)">Case Metadata</h3>
-                <div class="rounded-xl p-4 flex flex-col gap-3" style="background: var(--color-surface); border: var(--border-style)">
-                  @for (row of [
-                    { label: 'Title', value: m.title },
-                    { label: 'Subtitle', value: m.subtitle },
-                    { label: 'Type', value: m.caseType },
-                    { label: 'Difficulty', value: m.difficulty },
-                    { label: 'Setting', value: m.setting }
-                  ]; track row.label) {
+                <h3 class="font-heading text-xl" style="color: var(--color-accent)">
+                  Case Metadata
+                </h3>
+                <div
+                  class="rounded-xl p-4 flex flex-col gap-3"
+                  style="background: var(--color-surface); border: var(--border-style)"
+                >
+                  @for (
+                    row of [
+                      { label: 'Title', value: m.title },
+                      { label: 'Subtitle', value: m.subtitle },
+                      { label: 'Type', value: m.caseType },
+                      { label: 'Difficulty', value: m.difficulty },
+                      { label: 'Setting', value: m.setting },
+                    ];
+                    track row.label
+                  ) {
                     <div>
-                      <p class="font-mono text-[10px] uppercase tracking-widest" style="color: var(--color-text-muted)">{{ row.label }}</p>
+                      <p
+                        class="font-mono text-[10px] uppercase tracking-widest"
+                        style="color: var(--color-text-muted)"
+                      >
+                        {{ row.label }}
+                      </p>
                       <p class="text-sm mt-0.5" style="color: var(--color-text)">{{ row.value }}</p>
                     </div>
                   }
                   <div>
-                    <p class="font-mono text-[10px] uppercase tracking-widest mb-1" style="color: var(--color-text-muted)">Briefing</p>
-                    <p class="text-sm whitespace-pre-wrap" style="color: var(--color-text)">{{ m.briefing }}</p>
+                    <p
+                      class="font-mono text-[10px] uppercase tracking-widest mb-1"
+                      style="color: var(--color-text-muted)"
+                    >
+                      Briefing
+                    </p>
+                    <p class="text-sm whitespace-pre-wrap" style="color: var(--color-text)">
+                      {{ m.briefing }}
+                    </p>
                   </div>
                   <div>
-                    <p class="font-mono text-[10px] uppercase tracking-widest mb-1" style="color: var(--color-text-muted)">Act I Summary</p>
+                    <p
+                      class="font-mono text-[10px] uppercase tracking-widest mb-1"
+                      style="color: var(--color-text-muted)"
+                    >
+                      Act I Summary
+                    </p>
                     <p class="text-sm" style="color: var(--color-text)">{{ m.act1Summary }}</p>
                   </div>
                   <div>
-                    <p class="font-mono text-[10px] uppercase tracking-widest mb-1" style="color: var(--color-text-muted)">Act II Summary</p>
+                    <p
+                      class="font-mono text-[10px] uppercase tracking-widest mb-1"
+                      style="color: var(--color-text-muted)"
+                    >
+                      Act II Summary
+                    </p>
                     <p class="text-sm" style="color: var(--color-text)">{{ m.act2Summary }}</p>
                   </div>
                   <div>
-                    <p class="font-mono text-[10px] uppercase tracking-widest mb-1" style="color: var(--color-text-muted)">Act III Summary</p>
+                    <p
+                      class="font-mono text-[10px] uppercase tracking-widest mb-1"
+                      style="color: var(--color-text-muted)"
+                    >
+                      Act III Summary
+                    </p>
                     <p class="text-sm" style="color: var(--color-text)">{{ m.act3Summary }}</p>
                   </div>
                 </div>
@@ -299,47 +351,110 @@ type RequestStatusTone = {
                 @let t = casePackage().truth;
                 @let sx = casePackage().solutionExplanation;
                 <h3 class="font-heading text-xl" style="color: var(--color-accent)">Truth Layer</h3>
-                <div class="rounded-xl p-4 flex flex-col gap-3" style="background: var(--color-surface); border: var(--border-style)">
-                  @for (row of [
-                    { label: 'Culprit ID', value: t.culpritId },
-                    { label: 'Motive', value: t.motive },
-                    { label: 'Method', value: t.method },
-                    { label: 'Key Contradiction', value: t.keyContradiction },
-                    { label: 'Red Herring Explanation', value: t.redHerringExplanation },
-                    { label: 'True Timeline', value: t.trueTimeline }
-                  ]; track row.label) {
+                <div
+                  class="rounded-xl p-4 flex flex-col gap-3"
+                  style="background: var(--color-surface); border: var(--border-style)"
+                >
+                  @for (
+                    row of [
+                      { label: 'Culprit ID', value: t.culpritId },
+                      { label: 'Motive', value: t.motive },
+                      { label: 'Method', value: t.method },
+                      { label: 'Key Contradiction', value: t.keyContradiction },
+                      { label: 'Red Herring Explanation', value: t.redHerringExplanation },
+                      { label: 'True Timeline', value: t.trueTimeline },
+                    ];
+                    track row.label
+                  ) {
                     <div>
-                      <p class="font-mono text-[10px] uppercase tracking-widest" style="color: var(--color-text-muted)">{{ row.label }}</p>
-                      <p class="text-sm mt-0.5 whitespace-pre-wrap" style="color: var(--color-text)">{{ row.value }}</p>
+                      <p
+                        class="font-mono text-[10px] uppercase tracking-widest"
+                        style="color: var(--color-text-muted)"
+                      >
+                        {{ row.label }}
+                      </p>
+                      <p
+                        class="text-sm mt-0.5 whitespace-pre-wrap"
+                        style="color: var(--color-text)"
+                      >
+                        {{ row.value }}
+                      </p>
                     </div>
                   }
                   <div>
-                    <p class="font-mono text-[10px] uppercase tracking-widest mb-1" style="color: var(--color-text-muted)">Lying Suspects</p>
-                    <p class="text-sm font-mono" style="color: var(--color-text)">{{ t.lyingSuspectIds.join(', ') || 'none' }}</p>
+                    <p
+                      class="font-mono text-[10px] uppercase tracking-widest mb-1"
+                      style="color: var(--color-text-muted)"
+                    >
+                      Lying Suspects
+                    </p>
+                    <p class="text-sm font-mono" style="color: var(--color-text)">
+                      {{ t.lyingSuspectIds.join(', ') || 'none' }}
+                    </p>
                   </div>
                   <div>
-                    <p class="font-mono text-[10px] uppercase tracking-widest mb-1" style="color: var(--color-text-muted)">Mistaken Suspects</p>
-                    <p class="text-sm font-mono" style="color: var(--color-text)">{{ t.mistakenSuspectIds.join(', ') || 'none' }}</p>
+                    <p
+                      class="font-mono text-[10px] uppercase tracking-widest mb-1"
+                      style="color: var(--color-text-muted)"
+                    >
+                      Mistaken Suspects
+                    </p>
+                    <p class="text-sm font-mono" style="color: var(--color-text)">
+                      {{ t.mistakenSuspectIds.join(', ') || 'none' }}
+                    </p>
                   </div>
                   <div>
-                    <p class="font-mono text-[10px] uppercase tracking-widest mb-1" style="color: var(--color-text-muted)">Hiding Secret</p>
-                    <p class="text-sm font-mono" style="color: var(--color-text)">{{ t.hidingSecretSuspectIds.join(', ') || 'none' }}</p>
+                    <p
+                      class="font-mono text-[10px] uppercase tracking-widest mb-1"
+                      style="color: var(--color-text-muted)"
+                    >
+                      Hiding Secret
+                    </p>
+                    <p class="text-sm font-mono" style="color: var(--color-text)">
+                      {{ t.hidingSecretSuspectIds.join(', ') || 'none' }}
+                    </p>
                   </div>
                   <div>
-                    <p class="font-mono text-[10px] uppercase tracking-widest mb-1" style="color: var(--color-text-muted)">Revealing Clues</p>
-                    <p class="text-sm font-mono" style="color: var(--color-text)">{{ t.revealingClueIds.join(', ') || 'none' }}</p>
+                    <p
+                      class="font-mono text-[10px] uppercase tracking-widest mb-1"
+                      style="color: var(--color-text-muted)"
+                    >
+                      Revealing Clues
+                    </p>
+                    <p class="text-sm font-mono" style="color: var(--color-text)">
+                      {{ t.revealingClueIds.join(', ') || 'none' }}
+                    </p>
                   </div>
                   <div>
-                    <p class="font-mono text-[10px] uppercase tracking-widest mb-1" style="color: var(--color-text-muted)">Red Herring Clues</p>
-                    <p class="text-sm font-mono" style="color: var(--color-text)">{{ t.redHerringClueIds.join(', ') || 'none' }}</p>
+                    <p
+                      class="font-mono text-[10px] uppercase tracking-widest mb-1"
+                      style="color: var(--color-text-muted)"
+                    >
+                      Red Herring Clues
+                    </p>
+                    <p class="text-sm font-mono" style="color: var(--color-text)">
+                      {{ t.redHerringClueIds.join(', ') || 'none' }}
+                    </p>
                   </div>
                   <div>
-                    <p class="font-mono text-[10px] uppercase tracking-widest mb-1" style="color: var(--color-text-muted)">Solution Narrative</p>
-                    <p class="text-sm whitespace-pre-wrap" style="color: var(--color-text)">{{ sx.narrative }}</p>
+                    <p
+                      class="font-mono text-[10px] uppercase tracking-widest mb-1"
+                      style="color: var(--color-text-muted)"
+                    >
+                      Solution Narrative
+                    </p>
+                    <p class="text-sm whitespace-pre-wrap" style="color: var(--color-text)">
+                      {{ sx.narrative }}
+                    </p>
                   </div>
                   @if (sx.stepsExplained.length) {
                     <div>
-                      <p class="font-mono text-[10px] uppercase tracking-widest mb-1" style="color: var(--color-text-muted)">Steps Explained</p>
+                      <p
+                        class="font-mono text-[10px] uppercase tracking-widest mb-1"
+                        style="color: var(--color-text-muted)"
+                      >
+                        Steps Explained
+                      </p>
                       <ol class="list-decimal pl-5 flex flex-col gap-1">
                         @for (step of sx.stepsExplained; track $index) {
                           <li class="text-sm" style="color: var(--color-text)">{{ step }}</li>
@@ -360,63 +475,146 @@ type RequestStatusTone = {
                         type="button"
                         (click)="selectedSuspectId.set(suspect.id)"
                         class="text-left rounded-xl border px-4 py-3 cursor-pointer transition-opacity hover:opacity-85"
-                        [style.background]="selectedSuspectId() === suspect.id ? 'rgba(201,168,76,0.12)' : 'var(--color-surface)'"
-                        [style.border-color]="selectedSuspectId() === suspect.id ? 'rgba(201,168,76,0.45)' : 'rgba(201,168,76,0.16)'"
+                        [style.background]="
+                          selectedSuspectId() === suspect.id
+                            ? 'rgba(201,168,76,0.12)'
+                            : 'var(--color-surface)'
+                        "
+                        [style.border-color]="
+                          selectedSuspectId() === suspect.id
+                            ? 'rgba(201,168,76,0.45)'
+                            : 'rgba(201,168,76,0.16)'
+                        "
                       >
                         @if (suspect.imageUrl) {
-                          <img [src]="suspect.imageUrl" [alt]="suspect.name" class="w-full h-24 object-cover rounded-lg mb-2" />
+                          <img
+                            [src]="suspect.imageUrl"
+                            [alt]="suspect.name"
+                            class="w-full h-24 object-cover rounded-lg mb-2"
+                          />
                         }
-                        <p class="font-heading text-sm" style="color: var(--color-accent)">{{ suspect.name }}</p>
-                        <p class="font-mono text-[10px]" style="color: var(--color-text-muted)">{{ suspect.occupation }}</p>
+                        <p class="font-heading text-sm" style="color: var(--color-accent)">
+                          {{ suspect.name }}
+                        </p>
+                        <p class="font-mono text-[10px]" style="color: var(--color-text-muted)">
+                          {{ suspect.occupation }}
+                        </p>
                         @if (casePackage().truth.culpritId === suspect.id) {
-                          <span class="inline-flex mt-1 px-2 py-0.5 rounded-full font-mono text-[9px] uppercase tracking-widest" style="background: rgba(239,68,68,0.18); color: rgb(252,165,165)">CULPRIT</span>
+                          <span
+                            class="inline-flex mt-1 px-2 py-0.5 rounded-full font-mono text-[9px] uppercase tracking-widest"
+                            style="background: rgba(239,68,68,0.18); color: rgb(252,165,165)"
+                            >CULPRIT</span
+                          >
                         }
                       </button>
                     }
                   </div>
                   @if (selectedSuspect(); as s) {
-                    <div class="rounded-xl p-4 flex flex-col gap-3" style="background: var(--color-surface); border: var(--border-style)">
+                    <div
+                      class="rounded-xl p-4 flex flex-col gap-3"
+                      style="background: var(--color-surface); border: var(--border-style)"
+                    >
                       <div class="flex items-start gap-4">
                         @if (s.imageUrl) {
-                          <button type="button" (click)="lightboxUrl.set(s.imageUrl!)" class="block w-28 h-28 rounded-xl overflow-hidden cursor-zoom-in shrink-0 hover:opacity-85 transition-opacity">
-                            <img [src]="s.imageUrl" [alt]="s.name" class="w-full h-full object-cover" />
+                          <button
+                            type="button"
+                            (click)="lightboxUrl.set(s.imageUrl!)"
+                            class="block w-28 h-28 rounded-xl overflow-hidden cursor-zoom-in shrink-0 hover:opacity-85 transition-opacity"
+                          >
+                            <img
+                              [src]="s.imageUrl"
+                              [alt]="s.name"
+                              class="w-full h-full object-cover"
+                            />
                           </button>
                         }
                         <div class="flex flex-col gap-1 min-w-0">
-                          <p class="font-heading text-xl" style="color: var(--color-accent)">{{ s.name }}</p>
-                          <p class="text-sm" style="color: var(--color-text-muted)">{{ s.occupation }}, age {{ s.age }}</p>
+                          <p class="font-heading text-xl" style="color: var(--color-accent)">
+                            {{ s.name }}
+                          </p>
+                          <p class="text-sm" style="color: var(--color-text-muted)">
+                            {{ s.occupation }}, age {{ s.age }}
+                          </p>
                           <div class="flex flex-wrap gap-1 mt-1">
-                            @if (s.isLying) { <span class="px-2 py-0.5 rounded-full font-mono text-[9px] uppercase" style="background: rgba(239,68,68,0.18); color: rgb(252,165,165)">Lying</span> }
-                            @if (s.isMistaken) { <span class="px-2 py-0.5 rounded-full font-mono text-[9px] uppercase" style="background: rgba(250,204,21,0.14); color: rgb(253,224,71)">Mistaken</span> }
-                            @if (s.isHidingSecret) { <span class="px-2 py-0.5 rounded-full font-mono text-[9px] uppercase" style="background: rgba(139,92,246,0.18); color: rgb(196,181,253)">Hiding Secret</span> }
+                            @if (s.isLying) {
+                              <span
+                                class="px-2 py-0.5 rounded-full font-mono text-[9px] uppercase"
+                                style="background: rgba(239,68,68,0.18); color: rgb(252,165,165)"
+                                >Lying</span
+                              >
+                            }
+                            @if (s.isMistaken) {
+                              <span
+                                class="px-2 py-0.5 rounded-full font-mono text-[9px] uppercase"
+                                style="background: rgba(250,204,21,0.14); color: rgb(253,224,71)"
+                                >Mistaken</span
+                              >
+                            }
+                            @if (s.isHidingSecret) {
+                              <span
+                                class="px-2 py-0.5 rounded-full font-mono text-[9px] uppercase"
+                                style="background: rgba(139,92,246,0.18); color: rgb(196,181,253)"
+                                >Hiding Secret</span
+                              >
+                            }
                           </div>
                         </div>
                       </div>
-                      @for (row of [
-                        { label: 'Relationship', value: s.relationship },
-                        { label: 'Description', value: s.description },
-                        { label: 'Personality', value: s.personality },
-                        { label: 'Alibi', value: s.alibi },
-                        { label: 'Secret (unrelated to case)', value: s.secretUnrelatedToCase }
-                      ]; track row.label) {
+                      @for (
+                        row of [
+                          { label: 'Relationship', value: s.relationship },
+                          { label: 'Description', value: s.description },
+                          { label: 'Personality', value: s.personality },
+                          { label: 'Alibi', value: s.alibi },
+                          { label: 'Secret (unrelated to case)', value: s.secretUnrelatedToCase },
+                        ];
+                        track row.label
+                      ) {
                         <div>
-                          <p class="font-mono text-[10px] uppercase tracking-widest" style="color: var(--color-text-muted)">{{ row.label }}</p>
-                          <p class="text-sm mt-0.5" style="color: var(--color-text)">{{ row.value }}</p>
+                          <p
+                            class="font-mono text-[10px] uppercase tracking-widest"
+                            style="color: var(--color-text-muted)"
+                          >
+                            {{ row.label }}
+                          </p>
+                          <p class="text-sm mt-0.5" style="color: var(--color-text)">
+                            {{ row.value }}
+                          </p>
                         </div>
                       }
                       @if (s.interviewDialogue.length) {
                         <div>
-                          <p class="font-mono text-[10px] uppercase tracking-widest mb-2" style="color: var(--color-text-muted)">Interview Dialogue ({{ s.interviewDialogue.length }} lines)</p>
+                          <p
+                            class="font-mono text-[10px] uppercase tracking-widest mb-2"
+                            style="color: var(--color-text-muted)"
+                          >
+                            Interview Dialogue ({{ s.interviewDialogue.length }} lines)
+                          </p>
                           <div class="flex flex-col gap-2 max-h-64 overflow-y-auto">
                             @for (line of s.interviewDialogue; track $index) {
-                              <div class="rounded-lg px-3 py-2 text-sm"
-                                [style.background]="line.speakerId === 'detective' ? 'rgba(201,168,76,0.1)' : 'rgba(0,0,0,0.2)'"
-                                [style.color]="line.revealsTruth ? 'rgb(134,239,172)' : 'var(--color-text)'"
+                              <div
+                                class="rounded-lg px-3 py-2 text-sm"
+                                [style.background]="
+                                  line.speakerId === 'detective'
+                                    ? 'rgba(201,168,76,0.1)'
+                                    : 'rgba(0,0,0,0.2)'
+                                "
+                                [style.color]="
+                                  line.revealsTruth ? 'rgb(134,239,172)' : 'var(--color-text)'
+                                "
                               >
                                 <div class="flex items-center gap-2 flex-wrap mb-0.5">
-                                  <span class="font-mono text-[10px] uppercase tracking-widest" style="color: var(--color-text-muted)">{{ line.speakerName }}</span>
+                                  <span
+                                    class="font-mono text-[10px] uppercase tracking-widest"
+                                    style="color: var(--color-text-muted)"
+                                    >{{ line.speakerName }}</span
+                                  >
                                   @if (line.revealsTruth) {
-                                    <span class="font-mono text-[9px] uppercase tracking-widest px-1.5 py-0.5 rounded-full" style="background: rgba(34,197,94,0.18); color: rgb(134,239,172)">reveals truth</span>
+                                    <span
+                                      class="font-mono text-[9px] uppercase tracking-widest px-1.5 py-0.5 rounded-full"
+                                      style="background: rgba(34,197,94,0.18); color: rgb(134,239,172)"
+                                      >reveals truth</span
+                                    >
                                   }
                                 </div>
                                 {{ line.text }}
@@ -427,7 +625,9 @@ type RequestStatusTone = {
                       }
                     </div>
                   } @else {
-                    <p class="text-sm italic" style="color: var(--color-text-muted)">Select a suspect to see all properties.</p>
+                    <p class="text-sm italic" style="color: var(--color-text-muted)">
+                      Select a suspect to see all properties.
+                    </p>
                   }
                 </div>
               }
@@ -442,52 +642,117 @@ type RequestStatusTone = {
                         type="button"
                         (click)="selectedLocationId.set(loc.id)"
                         class="text-left rounded-xl border px-4 py-3 cursor-pointer transition-opacity hover:opacity-85"
-                        [style.background]="selectedLocationId() === loc.id ? 'rgba(201,168,76,0.12)' : 'var(--color-surface)'"
-                        [style.border-color]="selectedLocationId() === loc.id ? 'rgba(201,168,76,0.45)' : 'rgba(201,168,76,0.16)'"
+                        [style.background]="
+                          selectedLocationId() === loc.id
+                            ? 'rgba(201,168,76,0.12)'
+                            : 'var(--color-surface)'
+                        "
+                        [style.border-color]="
+                          selectedLocationId() === loc.id
+                            ? 'rgba(201,168,76,0.45)'
+                            : 'rgba(201,168,76,0.16)'
+                        "
                       >
                         @if (loc.imageUrl) {
-                          <img [src]="loc.imageUrl" [alt]="loc.name" class="w-full h-24 object-cover rounded-lg mb-2" />
+                          <img
+                            [src]="loc.imageUrl"
+                            [alt]="loc.name"
+                            class="w-full h-24 object-cover rounded-lg mb-2"
+                          />
                         } @else {
-                          <div class="w-full h-24 rounded-lg mb-2 flex items-center justify-center" style="background: rgba(0,0,0,0.2)">
-                            <span class="material-icons" style="color: var(--color-text-muted); font-size: 2rem">location_city</span>
+                          <div
+                            class="w-full h-24 rounded-lg mb-2 flex items-center justify-center"
+                            style="background: rgba(0,0,0,0.2)"
+                          >
+                            <span
+                              class="material-icons"
+                              style="color: var(--color-text-muted); font-size: 2rem"
+                              >location_city</span
+                            >
                           </div>
                         }
-                        <p class="font-heading text-sm" style="color: var(--color-accent)">{{ loc.name }}</p>
-                        <p class="font-mono text-[10px]" style="color: var(--color-text-muted)">{{ loc.cluesFoundHere.length }} clue(s)</p>
+                        <p class="font-heading text-sm" style="color: var(--color-accent)">
+                          {{ loc.name }}
+                        </p>
+                        <p class="font-mono text-[10px]" style="color: var(--color-text-muted)">
+                          {{ loc.cluesFoundHere.length }} clue(s)
+                        </p>
                       </button>
                     }
                   </div>
                   @if (selectedLocation(); as loc) {
-                    <div class="rounded-xl p-4 flex flex-col gap-3" style="background: var(--color-surface); border: var(--border-style)">
+                    <div
+                      class="rounded-xl p-4 flex flex-col gap-3"
+                      style="background: var(--color-surface); border: var(--border-style)"
+                    >
                       @if (loc.imageUrl) {
-                        <button type="button" (click)="lightboxUrl.set(loc.imageUrl!)" class="block w-28 h-28 rounded-xl overflow-hidden cursor-zoom-in shrink-0 hover:opacity-85 transition-opacity">
-                          <img [src]="loc.imageUrl" [alt]="loc.name" class="w-full h-full object-cover" />
+                        <button
+                          type="button"
+                          (click)="lightboxUrl.set(loc.imageUrl!)"
+                          class="block w-28 h-28 rounded-xl overflow-hidden cursor-zoom-in shrink-0 hover:opacity-85 transition-opacity"
+                        >
+                          <img
+                            [src]="loc.imageUrl"
+                            [alt]="loc.name"
+                            class="w-full h-full object-cover"
+                          />
                         </button>
                       }
-                      <p class="font-heading text-xl" style="color: var(--color-accent)">{{ loc.name }}</p>
-                      @for (row of [
-                        { label: 'ID', value: loc.id },
-                        { label: 'Description', value: loc.description },
-                        { label: 'Atmosphere', value: loc.atmosphere }
-                      ]; track row.label) {
+                      <p class="font-heading text-xl" style="color: var(--color-accent)">
+                        {{ loc.name }}
+                      </p>
+                      @for (
+                        row of [
+                          { label: 'ID', value: loc.id },
+                          { label: 'Description', value: loc.description },
+                          { label: 'Atmosphere', value: loc.atmosphere },
+                        ];
+                        track row.label
+                      ) {
                         <div>
-                          <p class="font-mono text-[10px] uppercase tracking-widest" style="color: var(--color-text-muted)">{{ row.label }}</p>
-                          <p class="text-sm mt-0.5" style="color: var(--color-text)">{{ row.value }}</p>
+                          <p
+                            class="font-mono text-[10px] uppercase tracking-widest"
+                            style="color: var(--color-text-muted)"
+                          >
+                            {{ row.label }}
+                          </p>
+                          <p class="text-sm mt-0.5" style="color: var(--color-text)">
+                            {{ row.value }}
+                          </p>
                         </div>
                       }
                       <div>
-                        <p class="font-mono text-[10px] uppercase tracking-widest mb-1" style="color: var(--color-text-muted)">Clues Found Here</p>
+                        <p
+                          class="font-mono text-[10px] uppercase tracking-widest mb-1"
+                          style="color: var(--color-text-muted)"
+                        >
+                          Clues Found Here
+                        </p>
                         @for (clueId of loc.cluesFoundHere; track clueId) {
-                          <p class="text-sm font-mono" style="color: var(--color-text)">{{ clueId }}</p>
+                          <p class="text-sm font-mono" style="color: var(--color-text)">
+                            {{ clueId }}
+                          </p>
                         }
                       </div>
                       <div>
-                        <p class="font-mono text-[10px] uppercase tracking-widest" style="color: var(--color-text-muted)">Image Prompt</p>
-                        <p class="text-xs mt-0.5 whitespace-pre-wrap" style="color: var(--color-text-muted)">{{ loc.imagePrompt }}</p>
+                        <p
+                          class="font-mono text-[10px] uppercase tracking-widest"
+                          style="color: var(--color-text-muted)"
+                        >
+                          Image Prompt
+                        </p>
+                        <p
+                          class="text-xs mt-0.5 whitespace-pre-wrap"
+                          style="color: var(--color-text-muted)"
+                        >
+                          {{ loc.imagePrompt }}
+                        </p>
                       </div>
                     </div>
                   } @else {
-                    <p class="text-sm italic" style="color: var(--color-text-muted)">Select a location to see all properties.</p>
+                    <p class="text-sm italic" style="color: var(--color-text-muted)">
+                      Select a location to see all properties.
+                    </p>
                   }
                 </div>
               }
@@ -502,64 +767,134 @@ type RequestStatusTone = {
                         type="button"
                         (click)="selectedClueId.set(clue.id)"
                         class="text-left rounded-xl border px-4 py-3 cursor-pointer transition-opacity hover:opacity-85"
-                        [style.background]="selectedClueId() === clue.id ? 'rgba(201,168,76,0.12)' : 'var(--color-surface)'"
-                        [style.border-color]="selectedClueId() === clue.id ? 'rgba(201,168,76,0.45)' : 'rgba(201,168,76,0.16)'"
+                        [style.background]="
+                          selectedClueId() === clue.id
+                            ? 'rgba(201,168,76,0.12)'
+                            : 'var(--color-surface)'
+                        "
+                        [style.border-color]="
+                          selectedClueId() === clue.id
+                            ? 'rgba(201,168,76,0.45)'
+                            : 'rgba(201,168,76,0.16)'
+                        "
                       >
                         @if (clue.imageUrl) {
-                          <img [src]="clue.imageUrl" [alt]="clue.name" class="w-full h-24 object-cover rounded-lg mb-2" />
+                          <img
+                            [src]="clue.imageUrl"
+                            [alt]="clue.name"
+                            class="w-full h-24 object-cover rounded-lg mb-2"
+                          />
                         } @else {
-                          <div class="w-full h-24 rounded-lg mb-2 flex items-center justify-center" style="background: rgba(0,0,0,0.2)">
-                            <span class="material-icons" style="color: var(--color-text-muted); font-size: 2rem">search</span>
+                          <div
+                            class="w-full h-24 rounded-lg mb-2 flex items-center justify-center"
+                            style="background: rgba(0,0,0,0.2)"
+                          >
+                            <span
+                              class="material-icons"
+                              style="color: var(--color-text-muted); font-size: 2rem"
+                              >search</span
+                            >
                           </div>
                         }
-                        <p class="font-heading text-sm" style="color: var(--color-accent)">{{ clue.name }}</p>
+                        <p class="font-heading text-sm" style="color: var(--color-accent)">
+                          {{ clue.name }}
+                        </p>
                         <div class="flex gap-1 flex-wrap">
                           @if (clue.isRedHerring) {
-                            <span class="px-1.5 py-0.5 rounded-full font-mono text-[9px] uppercase" style="background: rgba(239,68,68,0.18); color: rgb(252,165,165)">Red Herring</span>
+                            <span
+                              class="px-1.5 py-0.5 rounded-full font-mono text-[9px] uppercase"
+                              style="background: rgba(239,68,68,0.18); color: rgb(252,165,165)"
+                              >Red Herring</span
+                            >
                           }
-                          <span class="font-mono text-[9px]" style="color: var(--color-text-muted)">{{ clue.locationId }}</span>
+                          <span
+                            class="font-mono text-[9px]"
+                            style="color: var(--color-text-muted)"
+                            >{{ clue.locationId }}</span
+                          >
                         </div>
                       </button>
                     }
                   </div>
                   @if (selectedCaseClue(); as clue) {
-                    <div class="rounded-xl p-4 flex flex-col gap-3" style="background: var(--color-surface); border: var(--border-style)">
+                    <div
+                      class="rounded-xl p-4 flex flex-col gap-3"
+                      style="background: var(--color-surface); border: var(--border-style)"
+                    >
                       @if (clue.imageUrl) {
-                        <button type="button" (click)="lightboxUrl.set(clue.imageUrl!)" class="block w-28 h-28 rounded-xl overflow-hidden cursor-zoom-in shrink-0 hover:opacity-85 transition-opacity">
-                          <img [src]="clue.imageUrl" [alt]="clue.name" class="w-full h-full object-cover" />
+                        <button
+                          type="button"
+                          (click)="lightboxUrl.set(clue.imageUrl!)"
+                          class="block w-28 h-28 rounded-xl overflow-hidden cursor-zoom-in shrink-0 hover:opacity-85 transition-opacity"
+                        >
+                          <img
+                            [src]="clue.imageUrl"
+                            [alt]="clue.name"
+                            class="w-full h-full object-cover"
+                          />
                         </button>
                       }
                       <div class="flex items-center gap-2 flex-wrap">
-                        <p class="font-heading text-xl" style="color: var(--color-accent)">{{ clue.name }}</p>
+                        <p class="font-heading text-xl" style="color: var(--color-accent)">
+                          {{ clue.name }}
+                        </p>
                         @if (clue.isRedHerring) {
-                          <span class="px-2 py-0.5 rounded-full font-mono text-[10px] uppercase" style="background: rgba(239,68,68,0.18); color: rgb(252,165,165)">Red Herring</span>
+                          <span
+                            class="px-2 py-0.5 rounded-full font-mono text-[10px] uppercase"
+                            style="background: rgba(239,68,68,0.18); color: rgb(252,165,165)"
+                            >Red Herring</span
+                          >
                         }
                       </div>
-                      @for (row of [
-                        { label: 'ID', value: clue.id },
-                        { label: 'Location', value: clue.locationId },
-                        { label: 'Description', value: clue.description },
-                        { label: 'Reveals Info', value: clue.revealsInfo }
-                      ]; track row.label) {
+                      @for (
+                        row of [
+                          { label: 'ID', value: clue.id },
+                          { label: 'Location', value: clue.locationId },
+                          { label: 'Description', value: clue.description },
+                          { label: 'Reveals Info', value: clue.revealsInfo },
+                        ];
+                        track row.label
+                      ) {
                         <div>
-                          <p class="font-mono text-[10px] uppercase tracking-widest" style="color: var(--color-text-muted)">{{ row.label }}</p>
-                          <p class="text-sm mt-0.5" style="color: var(--color-text)">{{ row.value }}</p>
+                          <p
+                            class="font-mono text-[10px] uppercase tracking-widest"
+                            style="color: var(--color-text-muted)"
+                          >
+                            {{ row.label }}
+                          </p>
+                          <p class="text-sm mt-0.5" style="color: var(--color-text)">
+                            {{ row.value }}
+                          </p>
                         </div>
                       }
                       <div>
-                        <p class="font-mono text-[10px] uppercase tracking-widest" style="color: var(--color-text-muted)">Image Prompt</p>
-                        <p class="text-xs mt-0.5 whitespace-pre-wrap" style="color: var(--color-text-muted)">{{ clue.imagePrompt }}</p>
+                        <p
+                          class="font-mono text-[10px] uppercase tracking-widest"
+                          style="color: var(--color-text-muted)"
+                        >
+                          Image Prompt
+                        </p>
+                        <p
+                          class="text-xs mt-0.5 whitespace-pre-wrap"
+                          style="color: var(--color-text-muted)"
+                        >
+                          {{ clue.imagePrompt }}
+                        </p>
                       </div>
                     </div>
                   } @else {
-                    <p class="text-sm italic" style="color: var(--color-text-muted)">Select a clue to see all properties.</p>
+                    <p class="text-sm italic" style="color: var(--color-text-muted)">
+                      Select a clue to see all properties.
+                    </p>
                   }
                 </div>
               }
 
               <!-- EVENTS -->
               @if (caseDataSection() === 'events') {
-                <h3 class="font-heading text-xl" style="color: var(--color-accent)">Investigation Events</h3>
+                <h3 class="font-heading text-xl" style="color: var(--color-accent)">
+                  Investigation Events
+                </h3>
                 <div class="grid grid-cols-1 lg:grid-cols-[16rem_minmax(0,1fr)] gap-4">
                   <div class="flex flex-col gap-2">
                     @for (event of casePackage().eventGraph; track event.id) {
@@ -567,80 +902,170 @@ type RequestStatusTone = {
                         type="button"
                         (click)="selectedEventId.set(event.id)"
                         class="text-left rounded-xl border px-4 py-3 cursor-pointer transition-opacity hover:opacity-85"
-                        [style.background]="selectedEventId() === event.id ? 'rgba(201,168,76,0.12)' : 'var(--color-surface)'"
-                        [style.border-color]="selectedEventId() === event.id ? 'rgba(201,168,76,0.45)' : 'rgba(201,168,76,0.16)'"
+                        [style.background]="
+                          selectedEventId() === event.id
+                            ? 'rgba(201,168,76,0.12)'
+                            : 'var(--color-surface)'
+                        "
+                        [style.border-color]="
+                          selectedEventId() === event.id
+                            ? 'rgba(201,168,76,0.45)'
+                            : 'rgba(201,168,76,0.16)'
+                        "
                       >
                         <div class="flex items-center gap-2">
-                          <span class="font-mono text-[9px] uppercase tracking-widest px-1.5 py-0.5 rounded-full" style="background: rgba(0,0,0,0.25); color: var(--color-text-muted)">Act {{ event.act }}</span>
+                          <span
+                            class="font-mono text-[9px] uppercase tracking-widest px-1.5 py-0.5 rounded-full"
+                            style="background: rgba(0,0,0,0.25); color: var(--color-text-muted)"
+                            >Act {{ event.act }}</span
+                          >
                           @if (event.isMandatory) {
-                            <span class="font-mono text-[9px] uppercase tracking-widest px-1.5 py-0.5 rounded-full" style="background: rgba(201,168,76,0.12); color: var(--color-accent)">Required</span>
+                            <span
+                              class="font-mono text-[9px] uppercase tracking-widest px-1.5 py-0.5 rounded-full"
+                              style="background: rgba(201,168,76,0.12); color: var(--color-accent)"
+                              >Required</span
+                            >
                           }
                         </div>
-                        <p class="font-heading text-sm mt-1" style="color: var(--color-accent)">{{ event.title }}</p>
-                        <p class="font-mono text-[9px] mt-0.5" style="color: var(--color-text-muted)">{{ event.category }} / {{ event.type }}</p>
+                        <p class="font-heading text-sm mt-1" style="color: var(--color-accent)">
+                          {{ event.title }}
+                        </p>
+                        <p
+                          class="font-mono text-[9px] mt-0.5"
+                          style="color: var(--color-text-muted)"
+                        >
+                          {{ event.category }} / {{ event.type }}
+                        </p>
                       </button>
                     }
                   </div>
                   @if (selectedCaseEvent(); as ev) {
-                    <div class="rounded-xl p-4 flex flex-col gap-3" style="background: var(--color-surface); border: var(--border-style)">
+                    <div
+                      class="rounded-xl p-4 flex flex-col gap-3"
+                      style="background: var(--color-surface); border: var(--border-style)"
+                    >
                       <div class="flex flex-wrap gap-2 items-center">
-                        <span class="font-mono text-[10px] uppercase tracking-widest px-2 py-0.5 rounded-full" style="background: rgba(0,0,0,0.25); color: var(--color-text-muted)">Act {{ ev.act }}</span>
-                        <span class="font-mono text-[10px] uppercase tracking-widest px-2 py-0.5 rounded-full" style="background: rgba(0,0,0,0.2); color: var(--color-text-muted)">{{ ev.category }}</span>
+                        <span
+                          class="font-mono text-[10px] uppercase tracking-widest px-2 py-0.5 rounded-full"
+                          style="background: rgba(0,0,0,0.25); color: var(--color-text-muted)"
+                          >Act {{ ev.act }}</span
+                        >
+                        <span
+                          class="font-mono text-[10px] uppercase tracking-widest px-2 py-0.5 rounded-full"
+                          style="background: rgba(0,0,0,0.2); color: var(--color-text-muted)"
+                          >{{ ev.category }}</span
+                        >
                         @if (ev.isMandatory) {
-                          <span class="font-mono text-[10px] uppercase tracking-widest px-2 py-0.5 rounded-full" style="background: rgba(201,168,76,0.12); color: var(--color-accent)">Required</span>
+                          <span
+                            class="font-mono text-[10px] uppercase tracking-widest px-2 py-0.5 rounded-full"
+                            style="background: rgba(201,168,76,0.12); color: var(--color-accent)"
+                            >Required</span
+                          >
                         }
                       </div>
-                      <p class="font-heading text-xl" style="color: var(--color-accent)">{{ ev.title }}</p>
-                      @for (row of [
-                        { label: 'ID', value: ev.id },
-                        { label: 'Type', value: ev.type },
-                        { label: 'Description', value: ev.description },
-                        { label: 'Narration', value: ev.narration }
-                      ]; track row.label) {
+                      <p class="font-heading text-xl" style="color: var(--color-accent)">
+                        {{ ev.title }}
+                      </p>
+                      @for (
+                        row of [
+                          { label: 'ID', value: ev.id },
+                          { label: 'Type', value: ev.type },
+                          { label: 'Description', value: ev.description },
+                          { label: 'Narration', value: ev.narration },
+                        ];
+                        track row.label
+                      ) {
                         <div>
-                          <p class="font-mono text-[10px] uppercase tracking-widest" style="color: var(--color-text-muted)">{{ row.label }}</p>
-                          <p class="text-sm mt-0.5 whitespace-pre-wrap" style="color: var(--color-text)">{{ row.value }}</p>
+                          <p
+                            class="font-mono text-[10px] uppercase tracking-widest"
+                            style="color: var(--color-text-muted)"
+                          >
+                            {{ row.label }}
+                          </p>
+                          <p
+                            class="text-sm mt-0.5 whitespace-pre-wrap"
+                            style="color: var(--color-text)"
+                          >
+                            {{ row.value }}
+                          </p>
                         </div>
                       }
                       @if (ev.rewardsClueIds.length) {
                         <div>
-                          <p class="font-mono text-[10px] uppercase tracking-widest mb-1" style="color: var(--color-text-muted)">Rewards Clues</p>
+                          <p
+                            class="font-mono text-[10px] uppercase tracking-widest mb-1"
+                            style="color: var(--color-text-muted)"
+                          >
+                            Rewards Clues
+                          </p>
                           @for (id of ev.rewardsClueIds; track id) {
-                            <p class="text-sm font-mono" style="color: var(--color-text)">{{ id }}</p>
+                            <p class="text-sm font-mono" style="color: var(--color-text)">
+                              {{ id }}
+                            </p>
                           }
                         </div>
                       }
                       @if (ev.unlocksSuspectIds.length) {
                         <div>
-                          <p class="font-mono text-[10px] uppercase tracking-widest mb-1" style="color: var(--color-text-muted)">Unlocks Suspects</p>
+                          <p
+                            class="font-mono text-[10px] uppercase tracking-widest mb-1"
+                            style="color: var(--color-text-muted)"
+                          >
+                            Unlocks Suspects
+                          </p>
                           @for (id of ev.unlocksSuspectIds; track id) {
-                            <p class="text-sm font-mono" style="color: var(--color-text)">{{ id }}</p>
+                            <p class="text-sm font-mono" style="color: var(--color-text)">
+                              {{ id }}
+                            </p>
                           }
                         </div>
                       }
                       @if (ev.puzzleId) {
                         <div>
-                          <p class="font-mono text-[10px] uppercase tracking-widest" style="color: var(--color-text-muted)">Puzzle ID</p>
-                          <p class="text-sm font-mono mt-0.5" style="color: var(--color-text)">{{ ev.puzzleId }}</p>
+                          <p
+                            class="font-mono text-[10px] uppercase tracking-widest"
+                            style="color: var(--color-text-muted)"
+                          >
+                            Puzzle ID
+                          </p>
+                          <p class="text-sm font-mono mt-0.5" style="color: var(--color-text)">
+                            {{ ev.puzzleId }}
+                          </p>
                         </div>
                       }
                       @if (ev.dialogueSuspectId) {
                         <div>
-                          <p class="font-mono text-[10px] uppercase tracking-widest" style="color: var(--color-text-muted)">Dialogue Suspect</p>
-                          <p class="text-sm font-mono mt-0.5" style="color: var(--color-text)">{{ ev.dialogueSuspectId }}</p>
+                          <p
+                            class="font-mono text-[10px] uppercase tracking-widest"
+                            style="color: var(--color-text-muted)"
+                          >
+                            Dialogue Suspect
+                          </p>
+                          <p class="text-sm font-mono mt-0.5" style="color: var(--color-text)">
+                            {{ ev.dialogueSuspectId }}
+                          </p>
                         </div>
                       }
                       @if (ev.unlockConditions.length) {
                         <div>
-                          <p class="font-mono text-[10px] uppercase tracking-widest mb-1" style="color: var(--color-text-muted)">Unlock Conditions</p>
+                          <p
+                            class="font-mono text-[10px] uppercase tracking-widest mb-1"
+                            style="color: var(--color-text-muted)"
+                          >
+                            Unlock Conditions
+                          </p>
                           @for (c of ev.unlockConditions; track $index) {
-                            <p class="text-sm font-mono" style="color: var(--color-text)">{{ c.type }}: {{ c.referenceId }}</p>
+                            <p class="text-sm font-mono" style="color: var(--color-text)">
+                              {{ c.type }}: {{ c.referenceId }}
+                            </p>
                           }
                         </div>
                       }
                     </div>
                   } @else {
-                    <p class="text-sm italic" style="color: var(--color-text-muted)">Select an event to see all properties.</p>
+                    <p class="text-sm italic" style="color: var(--color-text-muted)">
+                      Select an event to see all properties.
+                    </p>
                   }
                 </div>
               }
@@ -653,21 +1078,35 @@ type RequestStatusTone = {
                     <div
                       class="rounded-xl px-4 py-3 flex gap-4"
                       style="background: var(--color-surface); border: var(--border-style)"
-                      [style.border-left-color]="entry.isTrue ? 'rgb(134,239,172)' : 'rgb(252,165,165)'"
+                      [style.border-left-color]="
+                        entry.isTrue ? 'rgb(134,239,172)' : 'rgb(252,165,165)'
+                      "
                       [style.border-left-width]="'3px'"
                     >
                       <div class="shrink-0 pt-0.5">
                         <span
                           class="inline-flex px-2 py-0.5 rounded-full font-mono text-[10px] uppercase"
-                          [style.background]="entry.isTrue ? 'rgba(34,197,94,0.14)' : 'rgba(239,68,68,0.14)'"
+                          [style.background]="
+                            entry.isTrue ? 'rgba(34,197,94,0.14)' : 'rgba(239,68,68,0.14)'
+                          "
                           [style.color]="entry.isTrue ? 'rgb(134,239,172)' : 'rgb(252,165,165)'"
-                        >{{ entry.isTrue ? 'True' : 'False' }}</span>
+                          >{{ entry.isTrue ? 'True' : 'False' }}</span
+                        >
                       </div>
                       <div class="flex-1 min-w-0">
-                        <p class="font-mono text-xs" style="color: var(--color-accent)">{{ entry.time }}</p>
-                        <p class="text-sm mt-1" style="color: var(--color-text)">{{ entry.description }}</p>
+                        <p class="font-mono text-xs" style="color: var(--color-accent)">
+                          {{ entry.time }}
+                        </p>
+                        <p class="text-sm mt-1" style="color: var(--color-text)">
+                          {{ entry.description }}
+                        </p>
                         @if (entry.involvedSuspectIds.length) {
-                          <p class="font-mono text-[10px] mt-1" style="color: var(--color-text-muted)">Suspects: {{ entry.involvedSuspectIds.join(', ') }}</p>
+                          <p
+                            class="font-mono text-[10px] mt-1"
+                            style="color: var(--color-text-muted)"
+                          >
+                            Suspects: {{ entry.involvedSuspectIds.join(', ') }}
+                          </p>
                         }
                       </div>
                     </div>
@@ -685,34 +1124,76 @@ type RequestStatusTone = {
                         type="button"
                         (click)="selectedCasePuzzleId.set(puzzle.id)"
                         class="text-left rounded-xl border px-4 py-3 cursor-pointer transition-opacity hover:opacity-85"
-                        [style.background]="selectedCasePuzzleId() === puzzle.id ? 'rgba(201,168,76,0.12)' : 'var(--color-surface)'"
-                        [style.border-color]="selectedCasePuzzleId() === puzzle.id ? 'rgba(201,168,76,0.45)' : 'rgba(201,168,76,0.16)'"
+                        [style.background]="
+                          selectedCasePuzzleId() === puzzle.id
+                            ? 'rgba(201,168,76,0.12)'
+                            : 'var(--color-surface)'
+                        "
+                        [style.border-color]="
+                          selectedCasePuzzleId() === puzzle.id
+                            ? 'rgba(201,168,76,0.45)'
+                            : 'rgba(201,168,76,0.16)'
+                        "
                       >
-                        <p class="font-mono text-[10px] uppercase tracking-widest" style="color: var(--color-text-muted)">{{ puzzle.type }}</p>
-                        <p class="font-heading text-sm mt-0.5" style="color: var(--color-accent)">{{ puzzle.title }}</p>
+                        <p
+                          class="font-mono text-[10px] uppercase tracking-widest"
+                          style="color: var(--color-text-muted)"
+                        >
+                          {{ puzzle.type }}
+                        </p>
+                        <p class="font-heading text-sm mt-0.5" style="color: var(--color-accent)">
+                          {{ puzzle.title }}
+                        </p>
                       </button>
                     }
                   </div>
                   @if (selectedCasePuzzle(); as puzzle) {
-                    <div class="rounded-xl p-4 flex flex-col gap-3" style="background: var(--color-surface); border: var(--border-style)">
+                    <div
+                      class="rounded-xl p-4 flex flex-col gap-3"
+                      style="background: var(--color-surface); border: var(--border-style)"
+                    >
                       <div>
-                        <span class="font-mono text-[10px] uppercase tracking-widest px-2 py-0.5 rounded-full" style="background: rgba(0,0,0,0.25); color: var(--color-text-muted)">{{ puzzle.type }}</span>
+                        <span
+                          class="font-mono text-[10px] uppercase tracking-widest px-2 py-0.5 rounded-full"
+                          style="background: rgba(0,0,0,0.25); color: var(--color-text-muted)"
+                          >{{ puzzle.type }}</span
+                        >
                       </div>
-                      <p class="font-heading text-xl" style="color: var(--color-accent)">{{ puzzle.title }}</p>
-                      @for (row of [
-                        { label: 'ID', value: puzzle.id },
-                        { label: 'Description', value: puzzle.description },
-                        { label: 'Solution Condition', value: puzzle.solutionCondition },
-                        { label: 'Rewarded Clue ID', value: puzzle.rewardedClueId }
-                      ]; track row.label) {
+                      <p class="font-heading text-xl" style="color: var(--color-accent)">
+                        {{ puzzle.title }}
+                      </p>
+                      @for (
+                        row of [
+                          { label: 'ID', value: puzzle.id },
+                          { label: 'Description', value: puzzle.description },
+                          { label: 'Solution Condition', value: puzzle.solutionCondition },
+                          { label: 'Rewarded Clue ID', value: puzzle.rewardedClueId },
+                        ];
+                        track row.label
+                      ) {
                         <div>
-                          <p class="font-mono text-[10px] uppercase tracking-widest" style="color: var(--color-text-muted)">{{ row.label }}</p>
-                          <p class="text-sm mt-0.5 whitespace-pre-wrap" style="color: var(--color-text)">{{ row.value }}</p>
+                          <p
+                            class="font-mono text-[10px] uppercase tracking-widest"
+                            style="color: var(--color-text-muted)"
+                          >
+                            {{ row.label }}
+                          </p>
+                          <p
+                            class="text-sm mt-0.5 whitespace-pre-wrap"
+                            style="color: var(--color-text)"
+                          >
+                            {{ row.value }}
+                          </p>
                         </div>
                       }
                       @if (puzzle.hints.length) {
                         <div>
-                          <p class="font-mono text-[10px] uppercase tracking-widest mb-1" style="color: var(--color-text-muted)">Hints</p>
+                          <p
+                            class="font-mono text-[10px] uppercase tracking-widest mb-1"
+                            style="color: var(--color-text-muted)"
+                          >
+                            Hints
+                          </p>
                           <ol class="list-decimal pl-5 flex flex-col gap-1">
                             @for (hint of puzzle.hints; track $index) {
                               <li class="text-sm" style="color: var(--color-text)">{{ hint }}</li>
@@ -722,11 +1203,12 @@ type RequestStatusTone = {
                       }
                     </div>
                   } @else {
-                    <p class="text-sm italic" style="color: var(--color-text-muted)">Select a puzzle to see all properties.</p>
+                    <p class="text-sm italic" style="color: var(--color-text-muted)">
+                      Select a puzzle to see all properties.
+                    </p>
                   }
                 </div>
               }
-
             </div>
           </div>
         }
@@ -1258,29 +1740,29 @@ type RequestStatusTone = {
       }
     </section>
 
-      <!-- ── Image lightbox ─────────────────────────────────────────────── -->
-      @if (lightboxUrl()) {
-        <div
-          class="fixed inset-0 z-200 flex items-center justify-center p-6"
-          style="background: rgba(0,0,0,0.88)"
+    <!-- ── Image lightbox ─────────────────────────────────────────────── -->
+    @if (lightboxUrl()) {
+      <div
+        class="fixed inset-0 z-200 flex items-center justify-center p-6"
+        style="background: rgba(0,0,0,0.88)"
+        (click)="lightboxUrl.set(null)"
+      >
+        <button
+          type="button"
           (click)="lightboxUrl.set(null)"
+          class="absolute top-4 right-4 p-2 rounded-lg cursor-pointer"
+          style="background: rgba(0,0,0,0.5); color: var(--color-text)"
         >
-          <button
-            type="button"
-            (click)="lightboxUrl.set(null)"
-            class="absolute top-4 right-4 p-2 rounded-lg cursor-pointer"
-            style="background: rgba(0,0,0,0.5); color: var(--color-text)"
-          >
-            <span class="material-icons">close</span>
-          </button>
-          <img
-            [src]="lightboxUrl()!"
-            class="max-w-full max-h-full rounded-xl object-contain"
-            style="box-shadow: 0 8px 48px rgba(0,0,0,0.7)"
-            (click)="$event.stopPropagation()"
-          />
-        </div>
-      }
+          <span class="material-icons">close</span>
+        </button>
+        <img
+          [src]="lightboxUrl()!"
+          class="max-w-full max-h-full rounded-xl object-contain"
+          style="box-shadow: 0 8px 48px rgba(0,0,0,0.7)"
+          (click)="$event.stopPropagation()"
+        />
+      </div>
+    }
   `,
 })
 export class DebugDashboardComponent {
@@ -1296,7 +1778,11 @@ export class DebugDashboardComponent {
     { id: 'case-data' as const, label: 'Case Data' },
   ];
   protected readonly caseDataSection = signal<CaseDataSection>('metadata');
-  protected readonly caseDataSections: { id: CaseDataSection; label: string; count: () => number | null }[] = [
+  protected readonly caseDataSections: {
+    id: CaseDataSection;
+    label: string;
+    count: () => number | null;
+  }[] = [
     { id: 'metadata', label: 'Metadata', count: () => null },
     { id: 'truth', label: 'Truth Layer', count: () => null },
     { id: 'suspects', label: 'Suspects', count: () => this.casePackage().suspects.length },
@@ -1313,23 +1799,23 @@ export class DebugDashboardComponent {
   protected readonly selectedTimelineId = signal<string | null>(null);
   protected readonly selectedCasePuzzleId = signal<string | null>(null);
 
-  protected readonly selectedSuspect = computed(() =>
-    this.casePackage().suspects.find((s) => s.id === this.selectedSuspectId()) ?? null,
+  protected readonly selectedSuspect = computed(
+    () => this.casePackage().suspects.find((s) => s.id === this.selectedSuspectId()) ?? null,
   );
-  protected readonly selectedLocation = computed(() =>
-    this.casePackage().locations.find((l) => l.id === this.selectedLocationId()) ?? null,
+  protected readonly selectedLocation = computed(
+    () => this.casePackage().locations.find((l) => l.id === this.selectedLocationId()) ?? null,
   );
-  protected readonly selectedCaseClue = computed(() =>
-    this.casePackage().clues.find((c) => c.id === this.selectedClueId()) ?? null,
+  protected readonly selectedCaseClue = computed(
+    () => this.casePackage().clues.find((c) => c.id === this.selectedClueId()) ?? null,
   );
-  protected readonly selectedCaseEvent = computed(() =>
-    this.casePackage().eventGraph.find((e) => e.id === this.selectedEventId()) ?? null,
+  protected readonly selectedCaseEvent = computed(
+    () => this.casePackage().eventGraph.find((e) => e.id === this.selectedEventId()) ?? null,
   );
-  protected readonly selectedTimeline = computed(() =>
-    this.casePackage().timeline.find((t) => t.id === this.selectedTimelineId()) ?? null,
+  protected readonly selectedTimeline = computed(
+    () => this.casePackage().timeline.find((t) => t.id === this.selectedTimelineId()) ?? null,
   );
-  protected readonly selectedCasePuzzle = computed(() =>
-    this.casePackage().puzzles.find((p) => p.id === this.selectedCasePuzzleId()) ?? null,
+  protected readonly selectedCasePuzzle = computed(
+    () => this.casePackage().puzzles.find((p) => p.id === this.selectedCasePuzzleId()) ?? null,
   );
 
   protected readonly lightboxUrl = signal<string | null>(null);

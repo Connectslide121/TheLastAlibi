@@ -902,8 +902,8 @@ type UnlockSpotlight = { kind: 'clue'; clue: Clue } | { kind: 'suspect'; suspect
                     class="text-sm leading-relaxed"
                     style="font-family: var(--font-body); color: var(--color-text)"
                   >
-                    Locations are revealed as you make progress. Clue counts update as you
-                    uncover evidence.
+                    Locations are revealed as you make progress. Clue counts update as you uncover
+                    evidence.
                   </p>
                 </div>
 
@@ -1348,19 +1348,19 @@ export class InvestigationView implements OnInit {
     const completedIds = new Set(state.completedEventIds);
     const foundClueIds = new Set(state.foundClueIds);
 
-    const actGroups = new Map<number, Array<{ location: GameLocation; cluesFound: number; cluesTotal: number }>>();
+    const actGroups = new Map<
+      number,
+      Array<{ location: GameLocation; cluesFound: number; cluesTotal: number }>
+    >();
     for (const location of pkg.locations) {
       const cluesHere = pkg.clues.filter((c) => c.locationId === location.id);
       const clueIdSet = new Set(cluesHere.map((c) => c.id));
-      const events = pkg.eventGraph.filter((e) =>
-        e.rewardsClueIds.some((id) => clueIdSet.has(id)),
-      );
+      const events = pkg.eventGraph.filter((e) => e.rewardsClueIds.some((id) => clueIdSet.has(id)));
 
       // A location is revealed once any event rewarding one of its clues has been completed,
       // or (fallback) if a clue physically at this location has been found.
       const isRevealed =
-        events.some((e) => completedIds.has(e.id)) ||
-        cluesHere.some((c) => foundClueIds.has(c.id));
+        events.some((e) => completedIds.has(e.id)) || cluesHere.some((c) => foundClueIds.has(c.id));
 
       if (!isRevealed) continue;
 
