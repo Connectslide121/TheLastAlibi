@@ -13,6 +13,35 @@ import {
   PuzzleConcept,
 } from './llm-generation.types';
 
+const SURPRISE_ME_OPTION = 'Surprise Me';
+
+function isSurpriseMeStyle(style: string): boolean {
+  return style.trim() === SURPRISE_ME_OPTION;
+}
+
+function foundationStyleInstruction(style: string): string {
+  if (!isSurpriseMeStyle(style)) {
+    return `ART STYLE: ${style}\n`;
+  }
+
+  return (
+    `ART STYLE MODE: Surprise Me\n` +
+    `Invent a distinctive original visual style for this case instead of using a stock preset. ` +
+    `Choose a style that fits the setting, tone, and mystery structure, and keep it coherent across ` +
+    `character portraits, locations, clues, UI theming, and puzzle presentation.\n`
+  );
+}
+
+function styleReference(style: string): string {
+  return isSurpriseMeStyle(style) ? 'an original visual style you invent for this case' : style;
+}
+
+function imagePromptTemplate(style: string, subjectTemplate: string): string {
+  return isSurpriseMeStyle(style)
+    ? `<image prompt matching the original visual style you invent for this case: ${subjectTemplate}>`
+    : `${style}, ${subjectTemplate}`;
+}
+
 // ── Step 1 — Case Foundation ──────────────────────────────────────────────────
 
 export function buildFoundationPrompt(
@@ -33,7 +62,7 @@ export function buildFoundationPrompt(
   return (
     `You are designing a UNIQUE detective mystery for an interactive game called "The Last Alibi".\n` +
     `DIFFICULTY: ${difficulty} — ${guide[difficulty]}\n` +
-    `ART STYLE: ${style}\n` +
+    foundationStyleInstruction(style) +
     `CREATIVITY SEED: ${seed} — use this to produce a completely original, unexpected scenario.\n` +
     `CASE TYPE (fixed): ${caseType} — the crime MUST be a ${caseType}. Build your entire scenario around this.\n\n` +
     `CRITICAL: Invent a wholly ORIGINAL case. Do NOT use "manor house murder", Victorian settings,\n` +
@@ -76,6 +105,7 @@ export function buildFoundationPrompt(
 export function buildSuspectsPrompt(f: CaseFoundation, style: string): string {
   return (
     `Generate all suspects for the detective mystery "${f.title}" (${f.setting}).\n` +
+    `Visual style reference: ${styleReference(style)}.\n` +
     `The culprit is the suspect matching label "${f.culpritLabel}".\n\n` +
     `Suspect labels: ${f.suspectLabels.map((l, i) => `${i + 1}. "${l}"`).join('; ')}\n` +
     `lyingSuspectLabels: ${JSON.stringify(f.lyingSuspectLabels)}\n` +
@@ -104,7 +134,7 @@ export function buildSuspectsPrompt(f: CaseFoundation, style: string): string {
     `        { "speakerId": "suspect-id", "speakerName": "Name", "text": "interview line", "revealsTruth": false },\n` +
     `        { "speakerId": "suspect-id", "speakerName": "Name", "text": "interview line", "revealsTruth": false }\n` +
     `      ],\n` +
-    `      "imagePrompt": "${style}, portrait of [name], [occupation], dramatic lighting"\n` +
+    `      "imagePrompt": "${imagePromptTemplate(style, 'portrait of [name], [occupation], dramatic lighting')}"\n` +
     `    }\n` +
     `  ]\n` +
     `}\n\n` +
@@ -375,7 +405,7 @@ export function buildPuzzleHtmlPrompt(
     `- ALL CSS and JS inline (no external files, no CDN links)\n` +
     `- Use the game theme as the source palette: page background ${theme.primaryColor}, panel/card background ${theme.secondaryColor}, accent/highlight color ${theme.accentColor}, surface color ${theme.surfaceColor}, body text ${theme.textColor}\n` +
     `- Readability is more important than strict palette fidelity. You may darken/lighten derived shades or add subtle overlays so long as the result still clearly matches the supplied palette\n` +
-    `- Atmosphere matches: ${style}\n` +
+    `- Atmosphere matches: ${styleReference(style)}\n` +
     `- The host application already shows the clues, instructions, hints, and answer submission UI; this HTML is supplemental presentation only\n` +
     `- MUST visually reinforce the same puzzle logic and clues from the concept above\n` +
     `- MUST NOT introduce any new rules, hidden clues, or required knowledge that are absent from the concept\n` +
@@ -447,9 +477,12 @@ export function buildHintLadderPrompt(
 export function buildVisualThemePrompt(f: CaseFoundation, style: string): string {
   return (
     `You are generating a visual theme and UI color scheme for the detective mystery "${f.title}".\n` +
-    `Style: "${style}" | Setting: ${f.setting} | Case type: ${f.caseType}\n\n` +
+    `Style request: "${styleReference(style)}" | Setting: ${f.setting} | Case type: ${f.caseType}\n\n` +
+    (isSurpriseMeStyle(style)
+      ? `Because the player selected Surprise Me, you must INVENT a fresh visual direction for this case rather than echoing a common preset. Make it specific, memorable, and strongly matched to this mystery's setting.\n\n`
+      : '') +
     `STEP 1 — DECIDE THEME BRIGHTNESS\n` +
-    `Based on "${style}", decide if the UI should be DARK (dark backgrounds, light text) or\n` +
+    `Based on "${styleReference(style)}", decide if the UI should be DARK (dark backgrounds, light text) or\n` +
     `LIGHT (light/pale backgrounds, dark text). Write your decision before the JSON as a comment, then follow it.\n\n` +
     `STEP 2 — PICK COLORS THAT MATCH YOUR DECISION\n` +
     `For DARK themes: primaryColor luminance ≤ 0.15, textColor luminance ≥ 0.60\n` +
@@ -490,11 +523,11 @@ export function buildVisualThemePrompt(f: CaseFoundation, style: string): string
     `    "textureFamily": "<paper|grain|cork|metal|leather|fabric|pixel_noise>"\n` +
     `  },\n` +
     `  "imagePromptTemplates": {\n` +
-    `    "suspectPortrait": "${style}, portrait of {name}, {occupation}, {description}, dramatic lighting",\n` +
-    `    "locationScene": "${style}, {name}, {atmosphere}, cinematic",\n` +
-    `    "clueObject": "${style}, still life, {name}, {description}, moody",\n` +
-    `    "eventSplash": "${style}, detective scene, atmospheric",\n` +
-    `    "puzzleObject": "${style}, antique object, intricate detail"\n` +
+    `    "suspectPortrait": "${imagePromptTemplate(style, 'portrait of {name}, {occupation}, {description}, dramatic lighting')}",\n` +
+    `    "locationScene": "${imagePromptTemplate(style, '{name}, {atmosphere}, cinematic')}",\n` +
+    `    "clueObject": "${imagePromptTemplate(style, 'still life, {name}, {description}, moody')}",\n` +
+    `    "eventSplash": "${imagePromptTemplate(style, 'detective scene, atmospheric')}",\n` +
+    `    "puzzleObject": "${imagePromptTemplate(style, 'antique object, intricate detail')}"\n` +
     `  }\n` +
     `}\n\n` +
     `Hard rules (violations will break the game UI):\n` +
@@ -508,7 +541,7 @@ export function buildVisualThemePrompt(f: CaseFoundation, style: string): string
     `- Prefer very high contrast for small typography: labels, metadata, helper text, and buttons should still look obviously readable when rendered around 12-14px\n` +
     `- Avoid low-contrast gold-on-beige, gray-on-gray, or washed-out monochrome palettes even if they are aesthetically on-theme\n` +
     `- Do NOT make accent and text the same color\n` +
-    `- The palette must evoke "${style}" — avoid defaulting to generic dark navy/gold unless it specifically fits`
+    `- The palette must evoke "${styleReference(style)}" — avoid defaulting to generic dark navy/gold unless it specifically fits`
   );
 }
 

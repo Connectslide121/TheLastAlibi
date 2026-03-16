@@ -13,8 +13,10 @@ const ART_STYLES = [
   'Pixel art detective',
   'Watercolour mystery',
   'Pulp paperback cover art',
-  'Surprise Me',
 ];
+
+const CUSTOM_STYLE_OPTION = 'Custom Style';
+const SURPRISE_ME_OPTION = 'Surprise Me';
 
 @Component({
   selector: 'app-home-view',
@@ -78,14 +80,24 @@ const ART_STYLES = [
             >Visual Style</label
           >
           <select
-            [(ngModel)]="selectedStyle"
-            class="w-full rounded border px-3 py-2 text-sm bg-(--color-secondary) text-(--color-text) cursor-pointer"
+            [(ngModel)]="selectedStyleOption"
+            class="w-full rounded border px-3 py-2 text-sm bg-(--color-secondary) text-(--color-text)"
             style="border-color: rgba(201,168,76,0.3);"
           >
-            @for (s of artStyles; track s) {
+            @for (s of styleOptions; track s) {
               <option [value]="s">{{ s }}</option>
             }
           </select>
+
+          @if (selectedStyleOption === customStyleOption) {
+            <input
+              [(ngModel)]="customStyle"
+              type="text"
+              placeholder="Type any visual direction"
+              class="w-full rounded border px-3 py-2 text-sm bg-(--color-secondary) text-(--color-text)"
+              style="border-color: rgba(201,168,76,0.3);"
+            />
+          }
         </div>
 
         <!-- New Case button -->
@@ -202,10 +214,14 @@ export class HomeView implements OnInit {
   readonly difficulty = signal<Difficulty>('normal');
   readonly savedCases = signal<SavedCaseSummary[]>([]);
   readonly pendingDelete = signal<SavedCaseSummary | null>(null);
-  selectedStyle = ART_STYLES[0];
+  selectedStyleOption = SURPRISE_ME_OPTION;
+  customStyle = '';
 
   readonly difficulties: Difficulty[] = ['easy', 'normal', 'hard', 'genius'];
   readonly artStyles = ART_STYLES;
+  readonly customStyleOption = CUSTOM_STYLE_OPTION;
+  readonly surpriseMeOption = SURPRISE_ME_OPTION;
+  readonly styleOptions = [...ART_STYLES, SURPRISE_ME_OPTION, CUSTOM_STYLE_OPTION];
 
   ngOnInit(): void {
     this.loadSavedCases();
@@ -213,9 +229,11 @@ export class HomeView implements OnInit {
 
   startNewCase(): void {
     const style =
-      this.selectedStyle === 'Surprise Me'
-        ? ART_STYLES[Math.floor(Math.random() * (ART_STYLES.length - 1))]
-        : this.selectedStyle;
+      this.selectedStyleOption === SURPRISE_ME_OPTION
+        ? SURPRISE_ME_OPTION
+        : this.selectedStyleOption === CUSTOM_STYLE_OPTION
+          ? this.customStyle.trim() || ART_STYLES[0]
+          : this.selectedStyleOption;
     void this.router.navigate(['/generate'], {
       state: { difficulty: this.difficulty(), style },
     });

@@ -1391,11 +1391,6 @@ export class InvestigationView implements OnInit {
     const visibleSuspectIds = new Set<string>(state.unlockedSuspectIds);
 
     state.interviewedSuspectIds.forEach((id) => visibleSuspectIds.add(id));
-    this.availableEvents().forEach((event) => {
-      if (event.dialogueSuspectId) {
-        visibleSuspectIds.add(event.dialogueSuspectId);
-      }
-    });
 
     return pkg.suspects.filter((suspect) => visibleSuspectIds.has(suspect.id));
   });
