@@ -373,7 +373,8 @@ export function buildPuzzleHtmlPrompt(
     `Requirements:\n` +
     `- Complete valid HTML document starting with <!DOCTYPE html>\n` +
     `- ALL CSS and JS inline (no external files, no CDN links)\n` +
-    `- Use these exact theme colors from the game: page background ${theme.primaryColor}, panel/card background ${theme.secondaryColor}, accent/highlight color ${theme.accentColor}, surface color ${theme.surfaceColor}, body text ${theme.textColor}\n` +
+    `- Use the game theme as the source palette: page background ${theme.primaryColor}, panel/card background ${theme.secondaryColor}, accent/highlight color ${theme.accentColor}, surface color ${theme.surfaceColor}, body text ${theme.textColor}\n` +
+    `- Readability is more important than strict palette fidelity. You may darken/lighten derived shades or add subtle overlays so long as the result still clearly matches the supplied palette\n` +
     `- Atmosphere matches: ${style}\n` +
     `- The host application already shows the clues, instructions, hints, and answer submission UI; this HTML is supplemental presentation only\n` +
     `- MUST visually reinforce the same puzzle logic and clues from the concept above\n` +
@@ -384,6 +385,11 @@ export function buildPuzzleHtmlPrompt(
     `- No localStorage, sessionStorage, or cookies\n` +
     `- No alert() or confirm()\n` +
     `- Show a clear visual success state when solved\n` +
+    `- Every visible text element must remain readable at a glance. Essential text must have strong contrast against its background; target WCAG AA at minimum and prefer ~7:1 for body text\n` +
+    `- Do NOT use low-opacity text for body copy, clues, instructions, labels, form inputs, buttons, or success messages\n` +
+    `- Do NOT place accent-colored text on light accent-tinted panels unless you have verified strong contrast. Prefer near-white text on dark surfaces or near-black text on light surfaces for body copy\n` +
+    `- Inputs, buttons, clue lists, and explanatory copy must all be clearly legible without zooming. Avoid washed-out beige on light gray, muted gold on cream, or any similar low-contrast combination\n` +
+    `- Use a minimum body font size of 16px and line-height of at least 1.4 for prose and clue text\n` +
     `- ABSOLUTELY NO <img> tags, no <image> tags, no base64 data URIs, no SVG images — text and CSS only\n` +
     `- Do NOT embed any binary data or base64 encoded content of any kind\n` +
     `- Keep the HTML under 240 lines total\n\n` +
@@ -456,8 +462,10 @@ export function buildVisualThemePrompt(f: CaseFoundation, style: string): string
     `  C) textColor on surfaceColor  (body text on elevated surfaces)\n` +
     `  D) accentColor on primaryColor (headings/labels on page background)\n` +
     `  E) accentColor on secondaryColor (headings on cards)\n` +
+    `  F) accentColor on surfaceColor (headings on elevated surfaces)\n` +
     `Contrast ratio = (L1+0.05)/(L2+0.05) where L1 is the lighter luminance.\n` +
-    `If any pair fails, adjust until all five pass.\n\n` +
+    `If any pair fails, adjust until all six pass.\n` +
+    `Do NOT choose muted mid-tone combinations that technically pass only in large text but become unreadable for small labels, clue cards, or generated puzzle UI.\n\n` +
     `Output ONLY raw JSON. No markdown fences. No comments inside the JSON.\n` +
     `Replace every placeholder in angle brackets with a real value.\n\n` +
     `{\n` +
@@ -497,6 +505,8 @@ export function buildVisualThemePrompt(f: CaseFoundation, style: string): string
     `- secondary and surface must be in the same dark/light direction as primary (all dark OR all light)\n` +
     `- textColor contrast ≥4.5:1 against primary, secondary, AND surface — if unsure, use near-white (#f0ece0) for dark themes or near-black (#1a1a1a) for light themes\n` +
     `- accentColor contrast ≥4.5:1 against primary and secondary — accent can be saturated/colorful but must still be readable as text\n` +
+    `- Prefer very high contrast for small typography: labels, metadata, helper text, and buttons should still look obviously readable when rendered around 12-14px\n` +
+    `- Avoid low-contrast gold-on-beige, gray-on-gray, or washed-out monochrome palettes even if they are aesthetically on-theme\n` +
     `- Do NOT make accent and text the same color\n` +
     `- The palette must evoke "${style}" — avoid defaulting to generic dark navy/gold unless it specifically fits`
   );

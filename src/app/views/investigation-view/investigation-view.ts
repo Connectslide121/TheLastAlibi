@@ -959,13 +959,14 @@ type UnlockSpotlight = { kind: 'clue'; clue: Clue } | { kind: 'suspect'; suspect
                     class="text-sm leading-relaxed"
                     style="font-family: var(--font-body); color: var(--color-text)"
                   >
-                    All case locations are listed here. Clue counts update as you uncover evidence.
+                    Locations appear here as your leads uncover them. Clue counts update as you
+                    discover evidence.
                   </p>
                 </div>
 
                 @if (locationsByAct().length === 0) {
                   <p class="text-sm italic" style="color: var(--color-text-muted)">
-                    No locations in this case.
+                    No locations uncovered yet.
                   </p>
                 }
 
@@ -1383,7 +1384,20 @@ export class InvestigationView implements OnInit {
   });
 
   readonly unlockedSuspects = computed((): Suspect[] => {
-    return this.casePackage()?.suspects ?? [];
+    const pkg = this.casePackage();
+    const state = this.gameState();
+    if (!pkg || !state) return [];
+
+    const visibleSuspectIds = new Set<string>(state.unlockedSuspectIds);
+
+    state.interviewedSuspectIds.forEach((id) => visibleSuspectIds.add(id));
+    this.availableEvents().forEach((event) => {
+      if (event.dialogueSuspectId) {
+        visibleSuspectIds.add(event.dialogueSuspectId);
+      }
+    });
+
+    return pkg.suspects.filter((suspect) => visibleSuspectIds.has(suspect.id));
   });
 
   readonly foundClues = computed((): Clue[] => {
@@ -1441,7 +1455,7 @@ export class InvestigationView implements OnInit {
   });
 
   readonly archiveSuspects = computed((): Suspect[] => {
-    return this.casePackage()?.suspects ?? [];
+    return this.unlockedSuspects();
   });
 
   readonly currentSpotlightClue = computed((): Clue | null => {
@@ -1501,6 +1515,8 @@ export class InvestigationView implements OnInit {
     if (!pkg || !state) return [];
 
     const foundClueIds = new Set(state.foundClueIds);
+    const completedEventIds = new Set(state.completedEventIds);
+    const visitedLocationIds = new Set(state.visitedLocationIds);
 
     const actGroups = new Map<
       number,
@@ -1510,6 +1526,12 @@ export class InvestigationView implements OnInit {
       const cluesHere = pkg.clues.filter((c) => c.locationId === location.id);
       const clueIdSet = new Set(cluesHere.map((c) => c.id));
       const events = pkg.eventGraph.filter((e) => e.rewardsClueIds.some((id) => clueIdSet.has(id)));
+      const isRevealed =
+        visitedLocationIds.has(location.id) ||
+        cluesHere.some((clue) => foundClueIds.has(clue.id)) ||
+        events.some((event) => completedEventIds.has(event.id));
+
+      if (!isRevealed) continue;
 
       // Assign to the act of the earliest relevant event; default to act 1.
       const act: number = events.length > 0 ? Math.min(...events.map((e) => e.act)) : 1;
@@ -1663,10 +1685,12 @@ export class InvestigationView implements OnInit {
   onPuzzleSolved(clueId: string): void {
     const event = this.selectedEvent();
     const puzzle = this.activePuzzle();
+    const pkg = this.casePackage();
     if (event) {
       if (!this.isReplayingEvent(event.id)) {
         if (puzzle) this.gsvc.completePuzzle(puzzle.id);
-        if (clueId && !event.rewardsClueIds.includes(clueId)) this.gsvc.discoverClue(clueId);
+        const effectiveRewardClueIds = pkg ? this.rewardClueIdsForEvent(event, pkg) : [];
+        if (clueId && !effectiveRewardClueIds.includes(clueId)) this.gsvc.discoverClue(clueId);
         this.completeCurrentEvent(event);
       }
     }
@@ -1766,12 +1790,15 @@ export class InvestigationView implements OnInit {
     const state = this.gsvc.state();
     if (!pkg || !state) return;
 
-    const newlyFoundClues = event.rewardsClueIds
+    const rewardClueIds = this.rewardClueIdsForEvent(event, pkg);
+    const unlockSuspectIds = event.unlocksSuspectIds ?? [];
+
+    const newlyFoundClues = rewardClueIds
       .filter((id) => !state.foundClueIds.includes(id))
       .map((id) => pkg.clues.find((clue) => clue.id === id))
       .filter((clue): clue is Clue => !!clue);
 
-    const newlyUnlockedSuspects = event.unlocksSuspectIds
+    const newlyUnlockedSuspects = unlockSuspectIds
       .filter((id) => !state.unlockedSuspectIds.includes(id))
       .map((id) => pkg.suspects.find((suspect) => suspect.id === id))
       .filter((suspect): suspect is Suspect => !!suspect);
@@ -1779,11 +1806,12 @@ export class InvestigationView implements OnInit {
     this.gsvc.completeEvent(event.id);
 
     const clueIds: string[] = [];
-    event.rewardsClueIds.forEach((id) => {
+    rewardClueIds.forEach((id) => {
       this.gsvc.discoverClue(id);
       clueIds.push(id);
     });
-    event.unlocksSuspectIds.forEach((id) => this.gsvc.unlockSuspect(id));
+    newlyFoundClues.forEach((clue) => this.gsvc.visitLocation(clue.locationId));
+    unlockSuspectIds.forEach((id) => this.gsvc.unlockSuspect(id));
 
     if (clueIds.length > 0) {
       this.recentClueIds.set(clueIds);
@@ -1792,6 +1820,19 @@ export class InvestigationView implements OnInit {
     this.enqueueUnlockSpotlights(newlyFoundClues, newlyUnlockedSuspects);
 
     this.checkActProgression();
+  }
+
+  private rewardClueIdsForEvent(event: InvestigationEvent, pkg: CasePackage): string[] {
+    const rewardIds = new Set(event.rewardsClueIds);
+    const puzzleRewardId = event.puzzleId
+      ? pkg.puzzles.find((puzzle) => puzzle.id === event.puzzleId)?.rewardedClueId
+      : null;
+
+    if (puzzleRewardId) {
+      rewardIds.add(puzzleRewardId);
+    }
+
+    return [...rewardIds].filter((id) => pkg.clues.some((clue) => clue.id === id));
   }
 
   dismissUnlockSpotlight(): void {

@@ -26,8 +26,8 @@ import { PuzzleEvent, Clue } from '../../models';
     >
       <!-- Header -->
       <div class="flex flex-col gap-1 shrink-0">
-        <h2 class="text-(--color-accent) font-serif font-bold text-xl">{{ puzzle().title }}</h2>
-        <p class="text-(--color-text) text-sm opacity-70">{{ puzzle().description }}</p>
+        <h2 class="text-(--color-accent) font-serif font-bold text-xl">{{ displayTitle() }}</h2>
+        <p class="text-(--color-text) text-sm opacity-70">{{ displayDescription() }}</p>
       </div>
 
       <!-- Reward clue preview (blurred until solved) -->
@@ -228,6 +228,11 @@ export class PuzzleFrameComponent {
   readonly shownHints = computed(() => this.puzzle().hints.slice(0, this.hintIndex() + 1));
   readonly hasMoreHints = computed(() => this.hintIndex() < this.puzzle().hints.length - 1);
   readonly canSubmit = computed(() => this.answer().trim().length > 0 && !this.solved());
+  readonly displayTitle = computed(() => this.puzzle().title || 'Puzzle Exhibit');
+  readonly displayDescription = computed(
+    () =>
+      this.puzzle().description || 'Examine the exhibit and submit the answer from the case file.',
+  );
   readonly displayInstructions = computed(
     () => this.puzzle().interactionInstructions ?? this.puzzle().description,
   );
@@ -270,7 +275,7 @@ export class PuzzleFrameComponent {
       this.answer.set('');
       this.invalidAttempt.set(false);
       this.hintIndex.set(-1);
-      console.group(`[PuzzleFrame] "${p.title}" (id: ${p.id})`);
+      console.group(`[PuzzleFrame] "${p.title || 'Puzzle Exhibit'}" (id: ${p.id})`);
       console.log('htmlComponent length:', p.htmlComponent?.length ?? 0);
       console.log('htmlComponent preview (first 500 chars):', p.htmlComponent?.slice(0, 500));
       console.log('full htmlComponent:', p.htmlComponent);

@@ -15,6 +15,7 @@ import {
 import { DebugRequestMeta } from './debug-trace.service';
 import { WorkerLlmService } from './worker-llm';
 import { repairEventGraph } from '../utils/event-graph-repair';
+import { normalizeCasePackage } from '../utils/normalize-case-package';
 
 import {
   Difficulty,
@@ -445,7 +446,7 @@ export class LlmService {
       redHerringClueIds: ctx.clues.redHerringClueIds,
     };
 
-    return {
+    return normalizeCasePackage({
       id: `case-${ctx.foundation.caseSlug}`,
       generatedAt: new Date().toISOString(),
       metadata: {
@@ -471,7 +472,7 @@ export class LlmService {
       visualDirection: ctx.visual.visualDirection,
       uiTheme: ctx.visual.uiTheme,
       imagePromptTemplates: ctx.visual.imagePromptTemplates,
-    };
+    });
   }
 
   // ---------------------------------------------------------------------------

@@ -4,6 +4,7 @@ import { catchError, map } from 'rxjs/operators';
 import { CasePackage } from '../models';
 import { DebugTraceSnapshot } from './debug-trace.service';
 import { deleteCaseImages } from '../utils/image-cache';
+import { normalizeCasePackage } from '../utils/normalize-case-package';
 
 export interface SavedCaseSummary {
   id: string;
@@ -50,7 +51,7 @@ export class CaseStoreService {
         ),
       ),
     ).pipe(
-      map((result) => result ?? null),
+      map((result) => (result ? normalizeCasePackage(result) : null)),
       catchError(() => of(null)),
     );
   }
