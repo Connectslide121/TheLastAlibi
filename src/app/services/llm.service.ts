@@ -19,6 +19,7 @@ import {
   UITheme,
   ImagePromptTemplates,
 } from '../models';
+import { DebugRequestMeta } from './debug-trace.service';
 import { WorkerLlmService } from './worker-llm';
 
 type Difficulty = CaseMetadata['difficulty'];
@@ -130,6 +131,7 @@ interface LlmCallOptions {
   systemPrompt?: string;
   maxTokens?: number;
   temperature?: number;
+  debugMeta?: DebugRequestMeta;
 }
 
 const STEP_DEFS: Omit<GenerationStepStatus, 'status'>[] = [
@@ -349,6 +351,10 @@ export class LlmService {
     return this.callAndParseJson<CaseFoundation>(prompt, {
       maxTokens: 1800,
       temperature: 0.8,
+      debugMeta: {
+        label: 'Case Foundation',
+        category: 'case-foundation',
+      },
     });
   }
 
@@ -405,6 +411,10 @@ export class LlmService {
     return this.callAndParseJson<{ culpritSuspectId: string; suspects: Suspect[] }>(prompt, {
       maxTokens: 3200,
       temperature: 0.8,
+      debugMeta: {
+        label: 'Suspects',
+        category: 'suspects',
+      },
     });
   }
 
@@ -433,6 +443,10 @@ export class LlmService {
     return this.callAndParseJson<{ locations: LocationSpec[] }>(prompt, {
       maxTokens: 1600,
       temperature: 0.7,
+      debugMeta: {
+        label: 'Locations',
+        category: 'locations',
+      },
     }).pipe(map((r) => r.locations));
   }
 
@@ -483,6 +497,10 @@ export class LlmService {
     return this.callAndParseJson<CluesResult>(prompt, {
       maxTokens: 2400,
       temperature: 0.75,
+      debugMeta: {
+        label: 'Clues & Evidence',
+        category: 'clues',
+      },
     });
   }
 
@@ -519,6 +537,10 @@ export class LlmService {
     return this.callAndParseJson<{ timeline: TimelineEvent[] }>(prompt, {
       maxTokens: 1800,
       temperature: 0.7,
+      debugMeta: {
+        label: 'Timeline',
+        category: 'timeline',
+      },
     }).pipe(map((r) => r.timeline));
   }
 
@@ -587,6 +609,10 @@ export class LlmService {
     return this.callAndParseJson<{ events: EventSpec[] }>(prompt, {
       maxTokens: 3200,
       temperature: 0.75,
+      debugMeta: {
+        label: 'Investigation Events',
+        category: 'event-graph',
+      },
     }).pipe(map((r) => r.events));
   }
 
@@ -602,35 +628,41 @@ export class LlmService {
     const puzzleLabels = events.filter((e) => e.puzzleLabel).map((e) => e.puzzleLabel!);
     if (puzzleLabels.length === 0) return of([]);
 
+    return forkJoin(puzzleLabels.map((label) => this.step7PuzzleConcept(f, clues, label)));
+  }
+
+  private step7PuzzleConcept(
+    f: CaseFoundation,
+    clues: CluesResult,
+    label: string,
+  ): Observable<PuzzleConcept> {
     const availableClueIds = clues.clues.map((c) => c.id).join(', ');
+    const puzzleId = `puzzle-${label}`;
 
     const prompt =
-      `Generate puzzle concepts for the detective mystery "${f.title}" (${f.setting}).\n` +
-      `Puzzle labels to generate (one concept per label): ${puzzleLabels.join(', ')}\n\n` +
+      `Generate a single puzzle concept for the detective mystery "${f.title}" (${f.setting}).\n` +
+      `Puzzle label: ${label}\n` +
+      `Required puzzle id: ${puzzleId}\n\n` +
       `Available clue IDs for rewards: ${availableClueIds}\n\n` +
-      `Your goal in this step is to ensure each puzzle has real logic, embedded clues, and a clearly intended solution before any HTML is written.\n` +
+      `Your goal in this step is to ensure this puzzle has real logic, embedded clues, and a clearly intended solution before any HTML is written.\n` +
       `Output ONLY raw JSON. No markdown fences.\n\n` +
       `{\n` +
-      `  "puzzleConcepts": [\n` +
-      `    {\n` +
-      `      "label": "desk-cipher",\n` +
-      `      "id": "puzzle-<kebab-case>",\n` +
-      `      "rewardedClueId": "<clue id from the available list above>",\n` +
-      `      "puzzleTitle": "The Brass Box Cipher",\n` +
-      `      "puzzleType": "cipher",\n` +
-      `      "puzzleDescription": "what the player sees and can interact with, 1-2 sentences",\n` +
-      `      "puzzleLogic": "the internal reasoning structure and how the clues lead to the answer",\n` +
-      `      "clues": ["explicit clue the player can inspect", "second clue that supports the logic", "optional third clue"],\n` +
-      `      "solution": "the exact intended answer or final state the player must reach",\n` +
-      `      "validationLogic": "the exact rule the HTML implementation should use to decide the puzzle is solved",\n` +
-      `      "uiConcept": "a short description of the interface layout and interaction style",\n` +
-      `      "hints": ["vague hint", "more specific", "points toward solution", "nearly explicit"]\n` +
-      `    }\n` +
-      `  ]\n` +
+      `  "label": "${label}",\n` +
+      `  "id": "${puzzleId}",\n` +
+      `  "rewardedClueId": "<clue id from the available list above>",\n` +
+      `  "puzzleTitle": "The Brass Box Cipher",\n` +
+      `  "puzzleType": "cipher",\n` +
+      `  "puzzleDescription": "what the player sees and can interact with, 1-2 sentences",\n` +
+      `  "puzzleLogic": "the internal reasoning structure and how the clues lead to the answer",\n` +
+      `  "clues": ["explicit clue the player can inspect", "second clue that supports the logic", "optional third clue"],\n` +
+      `  "solution": "the exact intended answer or final state the player must reach",\n` +
+      `  "validationLogic": "the exact rule the HTML implementation should use to decide the puzzle is solved",\n` +
+      `  "uiConcept": "a short description of the interface layout and interaction style",\n` +
+      `  "hints": ["vague hint", "more specific", "points toward solution", "nearly explicit"]\n` +
       `}\n\n` +
       `Rules:\n` +
-      `- Generate one concept per label: ${puzzleLabels.join(', ')}\n` +
-      `- label field must match the puzzle label exactly\n` +
+      `- label must be exactly ${label}\n` +
+      `- id must be exactly ${puzzleId}\n` +
       `- puzzleType: "cipher"|"lock"|"pattern"|"fragment"|"logic_grid"|"sequence"|"map"|"mechanical"\n` +
       `- rewardedClueId must be from the available clue IDs\n` +
       `- clues must contain 2-5 concrete puzzle clues the player can reason from\n` +
@@ -639,12 +671,24 @@ export class LlmService {
       `- validationLogic must clearly define what exact player action or answer counts as solved\n` +
       `- uiConcept must describe a simple HTML-friendly interface\n` +
       `- hints must contain 3-5 entries\n` +
-      `- Choose puzzle types that fit the ${f.setting} setting`;
+      `- Choose a puzzle type that fits the ${f.setting} setting`;
 
-    return this.callAndParseJson<{ puzzleConcepts: PuzzleConcept[] }>(prompt, {
-      maxTokens: 2200,
+    return this.callAndParseJson<PuzzleConcept>(prompt, {
+      maxTokens: 1200,
       temperature: 0.65,
-    }).pipe(map((r) => r.puzzleConcepts));
+      debugMeta: {
+        label: `Puzzle Concept: ${label}`,
+        category: 'puzzle-concept',
+        puzzleId,
+        puzzleLabel: label,
+      },
+    }).pipe(
+      map((concept) => ({
+        ...concept,
+        label,
+        id: puzzleId,
+      })),
+    );
   }
 
   // ---------------------------------------------------------------------------
@@ -683,7 +727,14 @@ export class LlmService {
       `- Keep the HTML under 200 lines total\n\n` +
       `Output ONLY the raw HTML. No JSON wrapper, no markdown fences, no explanation.`;
 
-    return this.callPuzzle(prompt).pipe(
+    return this.callPuzzle(prompt, {
+      debugMeta: {
+        label: `Puzzle HTML: ${concept.label}`,
+        category: 'puzzle-html',
+        puzzleId: concept.id,
+        puzzleLabel: concept.label,
+      },
+    }).pipe(
       map((raw) => this.stripHtmlFences(raw)),
       map(
         (html): PuzzleEvent => ({
@@ -748,6 +799,10 @@ export class LlmService {
     return this.callAndParseJson<HintResult>(prompt, {
       maxTokens: 2200,
       temperature: 0.7,
+      debugMeta: {
+        label: 'Hint Ladder',
+        category: 'hint-ladder',
+      },
     });
   }
 
@@ -824,6 +879,10 @@ export class LlmService {
     return this.callAndParseJson<VisualResult>(prompt, {
       maxTokens: 2200,
       temperature: 0.75,
+      debugMeta: {
+        label: 'Visual Theme',
+        category: 'visual-theme',
+      },
     });
   }
 
@@ -956,21 +1015,31 @@ export class LlmService {
   }
 
   /** Rewrites an image prompt into a safer form before it is sent to the image worker. */
-  createSafeImagePrompt(originalPrompt: string): Observable<string> {
+  createSafeImagePrompt(
+    originalPrompt: string,
+    debugMeta: DebugRequestMeta = {
+      label: 'Image Safe Prompt Rewrite',
+      category: 'image-safe-prompt',
+    },
+  ): Observable<string> {
     const prompt =
       `Rewrite this image-generation prompt into a safer production prompt before it is sent to the image worker.\n` +
       `ORIGINAL PROMPT: "${originalPrompt}"\n\n` +
       `Preserve the same scene, composition, atmosphere, visual style, and subject intent while making it less likely to trigger content filters.\n` +
       `- Replace specific character names with generic descriptors (e.g. "a middle-aged man" not "Victor LeBlanc")\n` +
+      `- Remove all proper nouns entirely, including first names, surnames, city names, venue names, and unique location names\n` +
       `- Replace identifiable person names, branded references, and overly specific personal details with neutral descriptive terms\n` +
+      `- The final prompt must contain zero proper nouns and zero quoted names\n` +
       `- Avoid wording that implies real-world violence, harm, or explicit content\n` +
       `- Prefer detective-fiction phrasing like "tense scene", "mysterious evidence", or "dramatic portrait" over explicit criminal acts\n` +
       `- Keep the same art style prefix, mood, atmosphere, and compositional intent intact\n` +
       `- Keep the prompt concise and image-model friendly\n` +
+      `- If any specific name or unique place remains, rewrite it again into a generic description before answering\n` +
       `- Output ONLY the rewritten prompt text — no explanation, no quotes, no extra text`;
     return this.callText(prompt, {
       maxTokens: 500,
       temperature: 0.1,
+      debugMeta,
     });
   }
 

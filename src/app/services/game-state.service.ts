@@ -10,6 +10,33 @@ import {
 
 const STORAGE_KEY = 'tla_game_state';
 
+function cloneState(state: GameState): GameState {
+  return {
+    ...state,
+    completedEventIds: [...state.completedEventIds],
+    visitedLocationIds: [...state.visitedLocationIds],
+    foundClueIds: [...state.foundClueIds],
+    completedPuzzleIds: [...state.completedPuzzleIds],
+    interviewedSuspectIds: [...state.interviewedSuspectIds],
+    unlockedSuspectIds: [...state.unlockedSuspectIds],
+    evidenceBoardNotes: state.evidenceBoardNotes.map((note) => ({
+      ...note,
+      connectedToIds: [...note.connectedToIds],
+    })),
+    boardCardPositions: Object.fromEntries(
+      Object.entries(state.boardCardPositions).map(([cardId, position]) => [
+        cardId,
+        { ...position },
+      ]),
+    ),
+    boardConnections: [...state.boardConnections],
+    contradictionEventIds: [...state.contradictionEventIds],
+    finalAccusation: state.finalAccusation
+      ? { ...state.finalAccusation, evidenceIds: [...state.finalAccusation.evidenceIds] }
+      : undefined,
+  };
+}
+
 @Injectable({ providedIn: 'root' })
 export class GameStateService {
   // Reactive state exposed as a signal
@@ -24,7 +51,7 @@ export class GameStateService {
   // ---------------------------------------------------------------------------
 
   initState(sessionId: string): void {
-    const fresh: GameState = {
+    const fresh = cloneState({
       sessionId,
       completedEventIds: [],
       visitedLocationIds: [],
@@ -40,21 +67,22 @@ export class GameStateService {
       boardCardPositions: {},
       boardConnections: [],
       contradictionEventIds: [],
-    };
+    });
     this._state.set(fresh);
     this.persist(fresh);
   }
 
   saveState(state: GameState): void {
-    this._state.set(state);
-    this.persist(state);
+    const next = cloneState(state);
+    this._state.set(next);
+    this.persist(next);
   }
 
   loadState(sessionId: string): GameState | null {
     const raw = localStorage.getItem(`${STORAGE_KEY}_${sessionId}`);
     if (!raw) return null;
     try {
-      const parsed = JSON.parse(raw) as GameState;
+      const parsed = cloneState(JSON.parse(raw) as GameState);
       this._state.set(parsed);
       return parsed;
     } catch {
@@ -234,8 +262,7 @@ export class GameStateService {
   private mutate(updater: (draft: GameState) => void): void {
     const current = this._state();
     if (!current) return;
-    // Shallow clone to trigger signal change detection
-    const draft = { ...current };
+    const draft = cloneState(current);
     updater(draft);
     this._state.set(draft);
     this.persist(draft);

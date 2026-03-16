@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { Observable, from, of } from 'rxjs';
 import { catchError, map } from 'rxjs/operators';
 import { CasePackage } from '../models';
+import { DebugTraceSnapshot } from './debug-trace.service';
 import { deleteCaseImages } from '../utils/image-cache';
 
 export interface SavedCaseSummary {
@@ -13,8 +14,9 @@ export interface SavedCaseSummary {
 }
 
 const DB_NAME = 'tla_case_store';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE_NAME = 'cases';
+const DEBUG_TRACE_STORE_NAME = 'debug_traces';
 
 @Injectable({ providedIn: 'root' })
 export class CaseStoreService {
@@ -27,7 +29,7 @@ export class CaseStoreService {
   storeCase(casePackage: CasePackage): Observable<void> {
     return from(
       this.dbPromise.then((db) =>
-        this.runTransaction(db, 'readwrite', (store) =>
+        this.runTransaction(db, STORE_NAME, 'readwrite', (store) =>
           store.put({ ...casePackage, _savedAt: new Date().toISOString() }),
         ),
       ),
@@ -43,7 +45,7 @@ export class CaseStoreService {
   loadCase(sessionId: string): Observable<CasePackage | null> {
     return from(
       this.dbPromise.then((db) =>
-        this.runTransaction<CasePackage | undefined>(db, 'readonly', (store) =>
+        this.runTransaction<CasePackage | undefined>(db, STORE_NAME, 'readonly', (store) =>
           store.get(sessionId),
         ),
       ),
@@ -53,10 +55,55 @@ export class CaseStoreService {
     );
   }
 
+  storeDebugTrace(caseId: string, trace: DebugTraceSnapshot): Observable<void> {
+    return from(
+      this.dbPromise.then((db) =>
+        this.runTransaction(db, DEBUG_TRACE_STORE_NAME, 'readwrite', (store) =>
+          store.put({ caseId, ...trace, savedAt: new Date().toISOString() }),
+        ),
+      ),
+    ).pipe(
+      map(() => void 0),
+      catchError(() => of(void 0)),
+    );
+  }
+
+  loadDebugTrace(caseId: string): Observable<DebugTraceSnapshot | null> {
+    return from(
+      this.dbPromise.then((db) =>
+        this.runTransaction<
+          | {
+              caseId: string;
+              aiRequests: DebugTraceSnapshot['aiRequests'];
+              imageRequests: DebugTraceSnapshot['imageRequests'];
+            }
+          | undefined
+        >(db, DEBUG_TRACE_STORE_NAME, 'readonly', (store) => store.get(caseId)),
+      ),
+    ).pipe(
+      map((result) =>
+        result
+          ? {
+              aiRequests: result.aiRequests ?? [],
+              imageRequests: result.imageRequests ?? [],
+            }
+          : null,
+      ),
+      catchError(() => of(null)),
+    );
+  }
+
   deleteCase(sessionId: string): Observable<void> {
     return from(
       this.dbPromise
-        .then((db) => this.runTransaction(db, 'readwrite', (store) => store.delete(sessionId)))
+        .then((db) =>
+          Promise.all([
+            this.runTransaction(db, STORE_NAME, 'readwrite', (store) => store.delete(sessionId)),
+            this.runTransaction(db, DEBUG_TRACE_STORE_NAME, 'readwrite', (store) =>
+              store.delete(sessionId),
+            ),
+          ]),
+        )
         .then(() => deleteCaseImages(sessionId)),
     ).pipe(
       map(() => void 0),
@@ -109,6 +156,9 @@ export class CaseStoreService {
         if (!db.objectStoreNames.contains(STORE_NAME)) {
           db.createObjectStore(STORE_NAME, { keyPath: 'id' });
         }
+        if (!db.objectStoreNames.contains(DEBUG_TRACE_STORE_NAME)) {
+          db.createObjectStore(DEBUG_TRACE_STORE_NAME, { keyPath: 'caseId' });
+        }
       };
 
       request.onsuccess = (event) => resolve((event.target as IDBOpenDBRequest).result);
@@ -118,12 +168,13 @@ export class CaseStoreService {
 
   private runTransaction<T = void>(
     db: IDBDatabase,
+    storeName: string,
     mode: IDBTransactionMode,
     action: (store: IDBObjectStore) => IDBRequest<T>,
   ): Promise<T> {
     return new Promise((resolve, reject) => {
-      const tx = db.transaction(STORE_NAME, mode);
-      const store = tx.objectStore(STORE_NAME);
+      const tx = db.transaction(storeName, mode);
+      const store = tx.objectStore(storeName);
       const request = action(store);
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);

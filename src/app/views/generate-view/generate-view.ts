@@ -1,5 +1,6 @@
 import { Component, OnInit, signal, inject } from '@angular/core';
 import { Router } from '@angular/router';
+import { DebugTraceService } from '../../services/debug-trace.service';
 import { LlmService } from '../../services/llm.service';
 import { ImageService } from '../../services/image.service';
 import { GameStateService } from '../../services/game-state.service';
@@ -190,6 +191,7 @@ const CASE_TYPE_LABELS: Record<string, string> = {
 })
 export class GenerateView implements OnInit {
   private readonly router = inject(Router);
+  private readonly debugTrace = inject(DebugTraceService);
   readonly llm = inject(LlmService);
   private readonly imageService = inject(ImageService);
   private readonly gameState = inject(GameStateService);
@@ -221,6 +223,7 @@ export class GenerateView implements OnInit {
   generate(): void {
     this.error.set('');
     this.phase.set('loading');
+    this.debugTrace.resetRun();
 
     this.llm.generateCasePackage(this.difficulty, this.style).subscribe({
       next: (pkg: CasePackage) => {
@@ -228,18 +231,27 @@ export class GenerateView implements OnInit {
         this.theme.applyTexture(pkg.uiTheme.textureFamily);
 
         this.caseStore.storeCase(pkg).subscribe(() => {
-          this.gameState.initState(pkg.id);
-          this.readyPkg.set(pkg);
-          this.phase.set('briefing');
+          this.caseStore.storeDebugTrace(pkg.id, this.debugTrace.snapshot()).subscribe(() => {
+            this.gameState.initState(pkg.id);
+            this.readyPkg.set(pkg);
+            this.phase.set('briefing');
 
-          // Continue loading images in the background so the briefing is usable immediately.
-          this.llm.markImageStepActive();
-          this.imageService.generateAllCaseImages(pkg).subscribe({
-            next: (updated) => this.readyPkg.set(updated),
-            complete: () => this.llm.markImageStepDone(),
-            error: () => {
-              this.llm.markImageStepDone();
-            },
+            // Continue loading images in the background so the briefing is usable immediately.
+            this.llm.markImageStepActive();
+            this.imageService.generateAllCaseImages(pkg).subscribe({
+              next: (updated) => {
+                this.readyPkg.set(updated);
+                this.caseStore.storeDebugTrace(pkg.id, this.debugTrace.snapshot()).subscribe();
+              },
+              complete: () => {
+                this.llm.markImageStepDone();
+                this.caseStore.storeDebugTrace(pkg.id, this.debugTrace.snapshot()).subscribe();
+              },
+              error: () => {
+                this.llm.markImageStepDone();
+                this.caseStore.storeDebugTrace(pkg.id, this.debugTrace.snapshot()).subscribe();
+              },
+            });
           });
         });
       },

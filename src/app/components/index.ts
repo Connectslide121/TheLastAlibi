@@ -8,3 +8,4 @@ export * from './puzzle-frame/puzzle-frame';
 export * from './toast/toast.service';
 export * from './toast/toast';
 export * from './act-banner/act-banner';
+export * from './debug-dashboard/debug-dashboard';

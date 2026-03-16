@@ -4,6 +4,7 @@ import { catchError, finalize, map, mergeMap, shareReplay, switchMap } from 'rxj
 
 import { environment } from '../../environments/environment';
 import { CasePackage } from '../models';
+import { DebugTraceService } from './debug-trace.service';
 import { LlmService } from './llm.service';
 import { getCachedImage, setCachedImage, hashPrompt, CachedImage } from '../utils/image-cache';
 
@@ -38,6 +39,7 @@ const IMAGE_BATCH_CONCURRENCY = 3;
 @Injectable({ providedIn: 'root' })
 export class ImageService {
   private readonly llm = inject(LlmService);
+  private readonly debug = inject(DebugTraceService);
   private readonly safePromptCache = new Map<string, Observable<string>>();
   private readonly inFlightImageRequests = new Map<string, Observable<string>>();
 
@@ -60,18 +62,45 @@ export class ImageService {
     const existingRequest = this.inFlightImageRequests.get(requestKey);
     if (existingRequest) return existingRequest;
 
+    let debugRequestId: string | null = null;
+
     const request$ = from(getCachedImage(caseId, entityType, entityId)).pipe(
       switchMap((cached: CachedImage | null) => {
         if (cached?.sourcePromptHash === sourcePromptHash) {
-          return of(trackAndReturn(URL.createObjectURL(cached.blob)));
+          debugRequestId = this.debug.beginImageRequest(caseId, entityType, entityId, prompt);
+          return of(trackAndReturn(URL.createObjectURL(cached.blob))).pipe(
+            map((url) => {
+              if (debugRequestId) {
+                this.debug.finishImageRequestSuccess(debugRequestId, 'cached', 'cache', url);
+              }
+              return url;
+            }),
+          );
         }
 
-        return this.getSafePrompt(prompt).pipe(
+        debugRequestId = this.debug.beginImageRequest(caseId, entityType, entityId, prompt);
+
+        return this.getSafePrompt(prompt, caseId, entityType, entityId).pipe(
           switchMap((safePrompt) => {
+            if (debugRequestId) {
+              this.debug.attachImageSafePrompt(debugRequestId, safePrompt);
+            }
             const promptHash = hashPrompt(safePrompt);
 
             if (cached && cached.promptHash === promptHash) {
+              if (debugRequestId) {
+                this.debug.finishImageRequestSuccess(debugRequestId, 'cached', 'cache');
+              }
               return of(trackAndReturn(URL.createObjectURL(cached.blob)));
+            }
+
+            const dims = DIMENSIONS[entityType] ?? { width: 512, height: 512 };
+            if (debugRequestId) {
+              this.debug.attachImageRequestPayload(debugRequestId, {
+                prompt: safePrompt,
+                width: dims.width,
+                height: dims.height,
+              });
             }
 
             return this.fetchFromWorker(safePrompt, entityType).pipe(
@@ -83,13 +112,32 @@ export class ImageService {
                     sourcePromptHash,
                     createdAt: Date.now(),
                   }),
-                ).pipe(map(() => trackAndReturn(URL.createObjectURL(blob)))),
+                ).pipe(
+                  map(() => trackAndReturn(URL.createObjectURL(blob))),
+                  map((url) => {
+                    if (debugRequestId) {
+                      this.debug.finishImageRequestSuccess(
+                        debugRequestId,
+                        'success',
+                        'worker',
+                        url,
+                      );
+                    }
+                    return url;
+                  }),
+                ),
               ),
             );
           }),
         );
       }),
-      catchError(() => of(this.buildCssPlaceholder(prompt))),
+      catchError((error: Error) => {
+        const fallbackUrl = this.buildCssPlaceholder(prompt);
+        if (debugRequestId) {
+          this.debug.finishImageRequestError(debugRequestId, error.message, fallbackUrl);
+        }
+        return of(fallbackUrl);
+      }),
       finalize(() => this.inFlightImageRequests.delete(requestKey)),
       shareReplay(1),
     );
@@ -213,12 +261,26 @@ export class ImageService {
     });
   }
 
-  private getSafePrompt(originalPrompt: string): Observable<string> {
+  private getSafePrompt(
+    originalPrompt: string,
+    caseId: string,
+    entityType: string,
+    entityId: string,
+  ): Observable<string> {
     const cacheKey = hashPrompt(`${SAFE_PROMPT_VERSION}:${originalPrompt}`);
     const cachedPrompt = this.safePromptCache.get(cacheKey);
     if (cachedPrompt) return cachedPrompt;
 
-    const prompt$ = this.llm.createSafeImagePrompt(originalPrompt).pipe(shareReplay(1));
+    const prompt$ = this.llm
+      .createSafeImagePrompt(originalPrompt, {
+        label: `Image Safe Prompt: ${entityType}/${entityId}`,
+        category: 'image-safe-prompt',
+        caseId,
+        entityType,
+        entityId,
+      })
+      .pipe(map((safePrompt) => this.normalizeSafePrompt(originalPrompt, safePrompt)))
+      .pipe(shareReplay(1));
     this.safePromptCache.set(cacheKey, prompt$);
     return prompt$;
   }
@@ -254,5 +316,62 @@ export class ImageService {
   <text x="256" y="272" font-family="serif" font-size="12" fill="#888" text-anchor="middle">${label}</text>
 </svg>`.trim();
     return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+  }
+
+  private normalizeSafePrompt(originalPrompt: string, safePrompt: string): string {
+    const cleanedPrompt = safePrompt.trim().replace(/^['\"]|['\"]$/g, '');
+    const candidate = cleanedPrompt.length > 0 ? cleanedPrompt : originalPrompt;
+    return this.scrubSpecificIdentifiers(candidate, originalPrompt)
+      .replace(/\s{2,}/g, ' ')
+      .trim();
+  }
+
+  private scrubSpecificIdentifiers(prompt: string, originalPrompt: string): string {
+    const terms = this.extractSensitiveTerms(originalPrompt);
+    let sanitized = prompt;
+
+    for (const term of terms) {
+      sanitized = sanitized.replace(this.toWholeWordRegex(term), 'an unnamed subject');
+    }
+
+    return sanitized;
+  }
+
+  private extractSensitiveTerms(originalPrompt: string): string[] {
+    const quotedTerms = Array.from(
+      originalPrompt.matchAll(/["']([^"']{2,})["']/g),
+      (match) => match[1],
+    );
+    const capitalizedPhrases = Array.from(
+      originalPrompt.matchAll(/\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,2}\b/g),
+      (match) => match[0],
+    ).filter((term) => !this.isAllowedDescriptor(term));
+
+    return [...new Set([...quotedTerms, ...capitalizedPhrases])].sort(
+      (left, right) => right.length - left.length,
+    );
+  }
+
+  private isAllowedDescriptor(term: string): boolean {
+    return [
+      'A',
+      'An',
+      'The',
+      'Detective',
+      'Mystery',
+      'Noir',
+      'Cinematic',
+      'Dramatic',
+      'Atmospheric',
+      'Portrait',
+      'Wide',
+      'Close',
+      'Medium',
+    ].includes(term);
+  }
+
+  private toWholeWordRegex(value: string): RegExp {
+    const escaped = value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp(`\\b${escaped}\\b`, 'gi');
   }
 }

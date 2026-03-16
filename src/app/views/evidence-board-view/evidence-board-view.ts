@@ -4,11 +4,11 @@ import { Router } from '@angular/router';
 import { CaseStoreService } from '../../services/case-store.service';
 import { GameStateService } from '../../services/game-state.service';
 import { ImageService } from '../../services/image.service';
-import { CasePackage, Suspect, Clue, EvidenceBoardNote } from '../../models';
+import { CasePackage, Suspect, Clue, EvidenceBoardNote, Location as GameLocation } from '../../models';
 
 interface BoardCard {
   id: string;
-  type: 'suspect' | 'clue';
+  type: 'suspect' | 'clue' | 'location';
   label: string;
   sublabel: string;
   imageUrl?: string;
@@ -177,9 +177,9 @@ const CARD_H = 130; // approx card height for midpoint calc
             <!-- Pin -->
             <div
               class="absolute -top-2.5 left-1/2 -translate-x-1/2 w-5 h-5 rounded-full flex items-center justify-center text-white text-xs shadow-md"
-              [style.background]="card.type === 'suspect' ? '#b91c1c' : '#1d4ed8'"
+              [style.background]="card.type === 'suspect' ? '#b91c1c' : card.type === 'clue' ? '#1d4ed8' : '#15803d'"
             >
-              {{ card.type === 'suspect' ? '●' : '◆' }}
+              {{ card.type === 'suspect' ? '●' : card.type === 'clue' ? '◆' : '▲' }}
             </div>
             <!-- Contradiction marker -->
             @if (card.hasContradiction) {
@@ -413,6 +413,166 @@ const CARD_H = 130; // approx card height for midpoint calc
         </div>
       }
 
+      <!-- ===== Location Detail Modal ===== -->
+      @if (expandedLocation()) {
+        <div
+          class="fixed inset-0 z-80 flex items-center justify-center p-4"
+          style="background: rgba(0,0,0,0.85)"
+          (click)="expandedLocation.set(null)"
+        >
+          <div
+            class="relative w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-lg flex flex-col"
+            style="background: var(--color-secondary); border: var(--border-style); animation: fadeIn 0.2s ease both"
+            (click)="$event.stopPropagation()"
+          >
+            <button
+              type="button"
+              (click)="expandedLocation.set(null)"
+              class="absolute top-3 right-3 z-10 p-1.5 rounded-full opacity-60 hover:opacity-100 cursor-pointer transition-opacity"
+              style="background: var(--color-surface)"
+            >
+              <span class="material-icons mi-md" style="color: var(--color-text)">close</span>
+            </button>
+            <div
+              class="w-full overflow-hidden rounded-t-lg"
+              style="aspect-ratio: 4/3; background: var(--color-surface)"
+            >
+              @if (expandedLocation()!.imageUrl) {
+                <img
+                  [src]="expandedLocation()!.imageUrl"
+                  [alt]="expandedLocation()!.name"
+                  class="w-full h-full object-cover"
+                />
+              } @else {
+                <div class="w-full h-full flex items-center justify-center opacity-20">
+                  <span class="material-icons" style="font-size: 5rem; color: var(--color-text)"
+                    >location_city</span
+                  >
+                </div>
+              }
+            </div>
+            <div class="p-6 flex flex-col gap-4">
+              <div class="flex items-center gap-2">
+                <span class="material-icons mi-md" style="color: var(--color-accent)">location_on</span>
+                <h2 class="font-heading text-2xl" style="color: var(--color-accent)">
+                  {{ expandedLocation()!.name }}
+                </h2>
+              </div>
+              <p
+                class="text-base leading-relaxed"
+                style="font-family: var(--font-body); color: var(--color-text)"
+              >
+                {{ expandedLocation()!.description }}
+              </p>
+              <div
+                class="rounded p-4 flex flex-col gap-2"
+                style="background: var(--color-surface); border: var(--border-style)"
+              >
+                <span
+                  class="font-mono text-xs uppercase tracking-widest flex items-center gap-1.5"
+                  style="color: var(--color-accent)"
+                >
+                  <span class="material-icons" style="font-size: 0.9rem">wb_twilight</span>
+                  Atmosphere
+                </span>
+                <p
+                  class="text-sm leading-relaxed italic"
+                  style="font-family: var(--font-body); color: var(--color-text)"
+                >
+                  {{ expandedLocation()!.atmosphere }}
+                </p>
+              </div>
+              @if (expandedLocation()!.cluesFoundHere.length) {
+                <p class="font-mono text-xs" style="color: var(--color-text-muted)">
+                  <span class="material-icons" style="font-size: 0.8rem; vertical-align: middle">search</span>
+                  {{ expandedLocation()!.cluesFoundHere.length }} clue(s) found here
+                </p>
+              }
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- ===== Location Detail Modal ===== -->
+      @if (expandedLocation()) {
+        <div
+          class="fixed inset-0 z-80 flex items-center justify-center p-4"
+          style="background: rgba(0,0,0,0.85)"
+          (click)="expandedLocation.set(null)"
+        >
+          <div
+            class="relative w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-lg flex flex-col"
+            style="background: var(--color-secondary); border: var(--border-style); animation: fadeIn 0.2s ease both"
+            (click)="$event.stopPropagation()"
+          >
+            <button
+              type="button"
+              (click)="expandedLocation.set(null)"
+              class="absolute top-3 right-3 z-10 p-1.5 rounded-full opacity-60 hover:opacity-100 cursor-pointer transition-opacity"
+              style="background: var(--color-surface)"
+            >
+              <span class="material-icons mi-md" style="color: var(--color-text)">close</span>
+            </button>
+            <div
+              class="w-full overflow-hidden rounded-t-lg"
+              style="aspect-ratio: 4/3; background: var(--color-surface)"
+            >
+              @if (expandedLocation()!.imageUrl) {
+                <img
+                  [src]="expandedLocation()!.imageUrl"
+                  [alt]="expandedLocation()!.name"
+                  class="w-full h-full object-cover"
+                />
+              } @else {
+                <div class="w-full h-full flex items-center justify-center opacity-20">
+                  <span class="material-icons" style="font-size: 5rem; color: var(--color-text)"
+                    >location_city</span
+                  >
+                </div>
+              }
+            </div>
+            <div class="p-6 flex flex-col gap-4">
+              <div class="flex items-center gap-2">
+                <span class="material-icons mi-md" style="color: var(--color-accent)">location_on</span>
+                <h2 class="font-heading text-2xl" style="color: var(--color-accent)">
+                  {{ expandedLocation()!.name }}
+                </h2>
+              </div>
+              <p
+                class="text-base leading-relaxed"
+                style="font-family: var(--font-body); color: var(--color-text)"
+              >
+                {{ expandedLocation()!.description }}
+              </p>
+              <div
+                class="rounded p-4 flex flex-col gap-2"
+                style="background: var(--color-surface); border: var(--border-style)"
+              >
+                <span
+                  class="font-mono text-xs uppercase tracking-widest flex items-center gap-1.5"
+                  style="color: var(--color-accent)"
+                >
+                  <span class="material-icons" style="font-size: 0.9rem">wb_twilight</span>
+                  Atmosphere
+                </span>
+                <p
+                  class="text-sm leading-relaxed italic"
+                  style="font-family: var(--font-body); color: var(--color-text)"
+                >
+                  {{ expandedLocation()!.atmosphere }}
+                </p>
+              </div>
+              @if (expandedLocation()!.cluesFoundHere.length) {
+                <p class="font-mono text-xs" style="color: var(--color-text-muted)">
+                  <span class="material-icons" style="font-size: 0.8rem; vertical-align: middle">search</span>
+                  {{ expandedLocation()!.cluesFoundHere.length }} clue(s) found here
+                </p>
+              }
+            </div>
+          </div>
+        </div>
+      }
+
       <style>
         @keyframes fadeIn {
           from {
@@ -441,6 +601,7 @@ export class EvidenceBoardView implements OnInit {
   readonly dragId = signal<string | null>(null);
   readonly expandedSuspect = signal<Suspect | null>(null);
   readonly expandedClue = signal<Clue | null>(null);
+  readonly expandedLocation = signal<GameLocation | null>(null);
 
   private dragOffsetX = 0;
   private dragOffsetY = 0;
@@ -504,7 +665,34 @@ export class EvidenceBoardView implements OnInit {
         };
       });
 
-    return [...suspects, ...clues];
+    const completedEventIds = new Set(state.completedEventIds);
+    const foundClueIds = new Set(state.foundClueIds);
+    const locations: BoardCard[] = pkg.locations
+      .filter((loc) => {
+        const clueIds = new Set(pkg.clues.filter((c) => c.locationId === loc.id).map((c) => c.id));
+        const locEvents = pkg.eventGraph.filter((e) =>
+          e.rewardsClueIds.some((id) => clueIds.has(id)),
+        );
+        return (
+          locEvents.some((e) => completedEventIds.has(e.id)) ||
+          pkg.clues.filter((c) => c.locationId === loc.id).some((c) => foundClueIds.has(c.id))
+        );
+      })
+      .map((loc, i) => {
+        const pos = positions[loc.id] ?? { x: 50 + i * 160, y: 620 };
+        return {
+          id: loc.id,
+          type: 'location' as const,
+          label: loc.name,
+          sublabel: loc.atmosphere.slice(0, 60),
+          imageUrl: loc.imageUrl,
+          hasContradiction: false,
+          x: pos.x,
+          y: pos.y,
+        };
+      });
+
+    return [...suspects, ...clues, ...locations];
   });
 
   readonly connectionLines = computed((): ConnectionLine[] => {
@@ -646,9 +834,12 @@ export class EvidenceBoardView implements OnInit {
     if (card.type === 'suspect') {
       const suspect = pkg.suspects.find((s) => s.id === card.id) ?? null;
       this.expandedSuspect.set(suspect);
-    } else {
+    } else if (card.type === 'clue') {
       const clue = pkg.clues.find((c) => c.id === card.id) ?? null;
       this.expandedClue.set(clue);
+    } else {
+      const location = pkg.locations.find((l) => l.id === card.id) ?? null;
+      this.expandedLocation.set(location);
     }
   }
 

@@ -16,17 +16,21 @@ import { PuzzleEvent, Clue } from '../../models';
   standalone: true,
   template: `
     <div
-      class="flex flex-col gap-4 rounded border bg-(--color-surface) p-6 h-full"
+      class="flex flex-col gap-4 rounded border bg-(--color-surface) h-full"
       style="border-color: rgba(201,168,76,0.3);"
+      [class.p-6]="!previewOnly()"
+      [class.p-0]="previewOnly()"
     >
       <!-- Header -->
-      <div class="flex flex-col gap-1 shrink-0">
-        <h2 class="text-(--color-accent) font-serif font-bold text-xl">{{ puzzle().title }}</h2>
-        <p class="text-(--color-text) text-sm opacity-70">{{ puzzle().description }}</p>
-      </div>
+      @if (!previewOnly()) {
+        <div class="flex flex-col gap-1 shrink-0">
+          <h2 class="text-(--color-accent) font-serif font-bold text-xl">{{ puzzle().title }}</h2>
+          <p class="text-(--color-text) text-sm opacity-70">{{ puzzle().description }}</p>
+        </div>
+      }
 
       <!-- Reward clue preview (blurred until solved) -->
-      @if (rewardClue()) {
+      @if (rewardClue() && !previewOnly()) {
         <div
           class="flex items-center gap-3 p-3 rounded border transition-all duration-700 shrink-0"
           style="border-color: rgba(201,168,76,0.2); background: var(--color-secondary);"
@@ -66,7 +70,7 @@ import { PuzzleEvent, Clue } from '../../models';
       </div>
 
       <!-- Solved banner with animation -->
-      @if (solved()) {
+      @if (solved() && !previewOnly()) {
         <div
           class="rounded border border-green-600/40 bg-green-900/20 p-4 text-green-400 text-sm flex items-center gap-2"
         >
@@ -82,26 +86,28 @@ import { PuzzleEvent, Clue } from '../../models';
       }
 
       <!-- Hints -->
-      <div class="flex flex-col gap-2">
-        @for (hint of shownHints(); track $index) {
-          <div
-            class="rounded border bg-(--color-secondary) px-4 py-2 text-(--color-text) text-sm italic opacity-70"
-            style="border-color: rgba(201,168,76,0.2);"
-          >
-            Hint {{ $index + 1 }}: {{ hint }}
-          </div>
-        }
-        @if (hasMoreHints() && !solved()) {
-          <button
-            type="button"
-            (click)="showNextHint()"
-            class="self-start text-xs text-(--color-accent) hover:underline transition-colors opacity-70 hover:opacity-100 cursor-pointer flex items-center gap-1"
-          >
-            <span class="material-icons mi-sm">help_outline</span>
-            Need a hint? ({{ puzzle().hints.length - shownHints().length }} remaining)
-          </button>
-        }
-      </div>
+      @if (!previewOnly()) {
+        <div class="flex flex-col gap-2">
+          @for (hint of shownHints(); track $index) {
+            <div
+              class="rounded border bg-(--color-secondary) px-4 py-2 text-(--color-text) text-sm italic opacity-70"
+              style="border-color: rgba(201,168,76,0.2);"
+            >
+              Hint {{ $index + 1 }}: {{ hint }}
+            </div>
+          }
+          @if (hasMoreHints() && !solved()) {
+            <button
+              type="button"
+              (click)="showNextHint()"
+              class="self-start text-xs text-(--color-accent) hover:underline transition-colors opacity-70 hover:opacity-100 cursor-pointer flex items-center gap-1"
+            >
+              <span class="material-icons mi-sm">help_outline</span>
+              Need a hint? ({{ puzzle().hints.length - shownHints().length }} remaining)
+            </button>
+          }
+        </div>
+      }
     </div>
   `,
 })
@@ -109,6 +115,7 @@ export class PuzzleFrameComponent {
   readonly puzzle = input.required<PuzzleEvent>();
   /** Optional: pass the actual Clue object for the reward preview. */
   readonly rewardClue = input<Clue | null>(null);
+  readonly previewOnly = input(false);
   readonly puzzleSolved = output<string>();
 
   readonly solved = signal(false);
