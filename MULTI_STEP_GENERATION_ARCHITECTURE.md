@@ -1,6 +1,6 @@
 # The Last Alibi — Multi-Step Generation Architecture
 
-> **Internal architecture document.** Describes the redesigned case-generation pipeline optimized for Gemma-style models, staged JSON generation, and backend validation between steps.
+> **Internal architecture document.** Describes the redesigned case-generation pipeline, staged JSON generation, and backend validation between steps.
 
 ---
 
@@ -8,7 +8,7 @@
 
 1. [Proposed Multi-Step Pipeline](#section-1)
 2. [JSON Contracts Per Step](#section-2)
-3. [How to Restructure for Gemma](#section-3)
+3. [Why The Pipeline Is Multi-Step](#section-3)
 4. [Prompt Strategy Per Step](#section-4)
 5. [Backend Validation and Repair Strategy](#section-5)
 6. [Special Handling for Puzzles](#section-6)
@@ -319,9 +319,9 @@ The old approach asked a single model call to produce ~800–2000 tokens of stru
 
 ---
 
-### Step 7 — Puzzle Specs
+### Step 7 — Puzzle Concepts
 
-**Purpose:** Generate puzzle specifications with no HTML. Each puzzle spec describes the puzzle type, mechanics, and solution. HTML generation is a separate sub-step (Step 7b). This separation is critical: generating HTML inside a large JSON blob is one of the most common failure modes.
+**Purpose:** Generate puzzle concepts with no HTML. Each concept defines the player-facing setup, the underlying logic, the clues, the intended solution, and the validation rule. HTML generation is a separate sub-step (Step 7b). This separation is critical: the first call proves the puzzle works logically, and the second call only needs to render that validated concept.
 
 **Required inputs:**
 - `EventGraphResult` from Step 6 (for `puzzleLabel` references)
@@ -330,19 +330,27 @@ The old approach asked a single model call to produce ~800–2000 tokens of stru
 
 **Depends on:** Steps 1, 4, 6 (validated)
 
-**Output JSON:** `PuzzleSpecsResult`
+**Output JSON:** `PuzzleConceptsResult`
 
 ```json
 {
-  "puzzleSpecs": [
+  "puzzleConcepts": [
     {
       "label": "desk-cipher",
       "id": "puzzle-desk-cipher",
-      "type": "cipher",
-      "title": "The Brass Box Cipher",
-      "description": "A small brass lockbox with a 4-symbol combination. The symbols are engraved around the edge of the lid.",
-      "solutionCondition": "The player selects the four symbols that match the ones on the torn letter fragment: moon, star, dagger, rose.",
-      "rewardedClueLabel": "cipher-solution",
+      "rewardedClueId": "cipher-solution",
+      "puzzleTitle": "The Brass Box Cipher",
+      "puzzleType": "cipher",
+      "puzzleDescription": "A small brass lockbox with a 4-symbol combination. The symbols are engraved around the edge of the lid.",
+      "puzzleLogic": "The symbols on the box must be matched to the order established by markings on the torn letter fragment.",
+      "clues": [
+        "The torn letter contains the same four symbols.",
+        "The edge scratches show the combination is entered clockwise.",
+        "A faded ink note says the sequence starts with the only night-sky symbol."
+      ],
+      "solution": "The player selects moon, star, dagger, rose in that order.",
+      "validationLogic": "Mark solved only when the player enters the exact symbol sequence moon, star, dagger, rose in order.",
+      "uiConcept": "A brass box illustration with four clickable symbol wheels and a confirm button.",
       "hints": [
         "The box was obviously carved by hand.",
         "The engraving style matches something you've already found.",
@@ -356,7 +364,10 @@ The old approach asked a single model call to produce ~800–2000 tokens of stru
 
 **Backend validation after step:**
 - Each `label` matches a `puzzleLabel` from `EventGraphResult`
-- `rewardedClueLabel` maps to a clue ID in `CluesResult`
+- `rewardedClueId` maps to a clue ID in `CluesResult`
+- `clues` has 2–5 entries and materially supports the puzzle logic
+- `solution` is explicit and derivable from the concept's clues
+- `validationLogic` defines an exact solvable condition the HTML can implement directly
 - `hints` has 3–5 entries
 - All IDs unique and kebab-case
 
@@ -371,7 +382,7 @@ The old approach asked a single model call to produce ~800–2000 tokens of stru
 **Purpose:** Generate the self-contained HTML component for a single puzzle. This is a separate call per puzzle to keep the output small and to allow targeted regeneration if the HTML is broken.
 
 **Required inputs:**
-- Single `PuzzleSpec` from Step 7
+- Single `PuzzleConcept` from Step 7
 - The puzzle's `id` (so the postMessage call can be exact)
 
 **Depends on:** Step 7 (validated)
@@ -699,11 +710,11 @@ This step returns a **raw HTML string**, not JSON. The backend wraps it into `{ 
 ---
 
 <a name="section-3"></a>
-## Section 3 — How to Restructure for Gemma
+## Section 3 — Why The Pipeline Is Multi-Step
 
 ### Why Smaller Prompts Are Better
 
-Gemma is a smaller model than Gemini Ultra. Its context window and reliable structured-output capability both have practical limits. When given a prompt that asks for 14 different entity types in a single JSON response, the model makes tradeoffs: later fields in the output receive less attention, and cross-references between arrays degrade in consistency. A 2000-token constraint is realistic for reliable Gemma output. The pipeline above keeps each step well under that.
+The project now routes text generation through model-specific Cloudflare Worker endpoints, but the core constraint remains the same: a single prompt that asks for 14 different entity types in one response is less reliable than staged generation. Smaller or faster models degrade on later fields first, and cross-references between arrays become inconsistent. The pipeline above keeps each step compact enough to preserve structured output quality.
 
 The critical problem with the one-shot approach is **attention dilution**. By the time the model is writing `eventGraph` entries, it has already generated 1000+ tokens of suspects, clues, and locations, and its attention window struggles to maintain the exact ID strings needed for valid cross-references. Smaller steps eliminate this problem by making each step's context fit comfortably in the model's working memory.
 
@@ -777,7 +788,7 @@ Each prompt should follow this structure:
 4. **Hard constraints** (bulleted, no more than 8): The 3–5 rules that matter most for this step.
 5. **Final instruction** (1 sentence): "Return raw valid JSON only. No markdown. No explanation."
 
-**Avoid:** Long schema definitions. Instead, provide a real example JSON with the target structure. Gemma responds better to examples than to abstract field descriptions.
+**Avoid:** Long schema definitions. Instead, provide a real example JSON with the target structure. The current Worker-backed text models respond better to concrete examples than to abstract field descriptions.
 
 ---
 
@@ -2156,4 +2167,4 @@ The existing validation logic in `LlmService.validateCrossReferences()` moves to
 
 ---
 
-*Last updated: Architecture v2 — Multi-Step Pipeline Design (Gemma-optimised)*
+*Last updated: Architecture v2 — Multi-Step Pipeline Design (Worker-routed text generation)*

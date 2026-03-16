@@ -70,6 +70,13 @@ export class GameStateService {
     this._state.set(null);
   }
 
+  deleteState(sessionId: string): void {
+    localStorage.removeItem(`${STORAGE_KEY}_${sessionId}`);
+    if (this._state()?.sessionId === sessionId) {
+      this._state.set(null);
+    }
+  }
+
   // ---------------------------------------------------------------------------
   // Queries
   // ---------------------------------------------------------------------------
@@ -155,9 +162,7 @@ export class GameStateService {
   }
 
   submitAccusation(accusation: FinalAccusation, casePackage: CasePackage): boolean {
-    const correct =
-      accusation.culpritId === casePackage.truth.culpritId &&
-      accusation.method.trim().toLowerCase() === casePackage.truth.method.trim().toLowerCase();
+    const correct = accusation.culpritId === casePackage.truth.culpritId;
 
     this.mutate((s) => {
       s.finalAccusation = accusation;

@@ -14,6 +14,7 @@ const DB_VERSION = 1;
 export interface CachedImage {
   blob: Blob;
   promptHash: string;
+  sourcePromptHash?: string;
   createdAt: number;
 }
 

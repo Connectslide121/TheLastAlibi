@@ -1,9 +1,10 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { Observable, from, of } from 'rxjs';
-import { catchError, map, switchMap } from 'rxjs/operators';
+import { catchError, finalize, map, mergeMap, shareReplay, switchMap } from 'rxjs/operators';
 
 import { environment } from '../../environments/environment';
 import { CasePackage } from '../models';
+import { LlmService } from './llm.service';
 import { getCachedImage, setCachedImage, hashPrompt, CachedImage } from '../utils/image-cache';
 
 /** Object URL registry — allows revocation when images are replaced. */
@@ -31,8 +32,15 @@ const DIMENSIONS: Record<string, { width: number; height: number }> = {
   clue: { width: 512, height: 512 },
 };
 
+const SAFE_PROMPT_VERSION = 'safe-prompt-v1';
+const IMAGE_BATCH_CONCURRENCY = 3;
+
 @Injectable({ providedIn: 'root' })
 export class ImageService {
+  private readonly llm = inject(LlmService);
+  private readonly safePromptCache = new Map<string, Observable<string>>();
+  private readonly inFlightImageRequests = new Map<string, Observable<string>>();
+
   /**
    * Generate a single image.
    *
@@ -47,30 +55,47 @@ export class ImageService {
     entityType: string,
     entityId: string,
   ): Observable<string> {
-    const promptHash = hashPrompt(prompt);
+    const sourcePromptHash = hashPrompt(`${SAFE_PROMPT_VERSION}:${prompt}`);
+    const requestKey = `${caseId}:${entityType}:${entityId}:${sourcePromptHash}`;
+    const existingRequest = this.inFlightImageRequests.get(requestKey);
+    if (existingRequest) return existingRequest;
 
-    // 1. Check IndexedDB cache
-    return from(getCachedImage(caseId, entityType, entityId)).pipe(
+    const request$ = from(getCachedImage(caseId, entityType, entityId)).pipe(
       switchMap((cached: CachedImage | null) => {
-        if (cached && cached.promptHash === promptHash) {
-          // Cache hit — return object URL
+        if (cached?.sourcePromptHash === sourcePromptHash) {
           return of(trackAndReturn(URL.createObjectURL(cached.blob)));
         }
-        // Cache miss — call the Worker
-        return this.fetchFromWorker(prompt, entityType).pipe(
-          switchMap((blob) =>
-            from(
-              setCachedImage(caseId, entityType, entityId, {
-                blob,
-                promptHash,
-                createdAt: Date.now(),
-              }),
-            ).pipe(map(() => trackAndReturn(URL.createObjectURL(blob)))),
-          ),
+
+        return this.getSafePrompt(prompt).pipe(
+          switchMap((safePrompt) => {
+            const promptHash = hashPrompt(safePrompt);
+
+            if (cached && cached.promptHash === promptHash) {
+              return of(trackAndReturn(URL.createObjectURL(cached.blob)));
+            }
+
+            return this.fetchFromWorker(safePrompt, entityType).pipe(
+              switchMap((blob) =>
+                from(
+                  setCachedImage(caseId, entityType, entityId, {
+                    blob,
+                    promptHash,
+                    sourcePromptHash,
+                    createdAt: Date.now(),
+                  }),
+                ).pipe(map(() => trackAndReturn(URL.createObjectURL(blob)))),
+              ),
+            );
+          }),
         );
       }),
       catchError(() => of(this.buildCssPlaceholder(prompt))),
+      finalize(() => this.inFlightImageRequests.delete(requestKey)),
+      shareReplay(1),
     );
+
+    this.inFlightImageRequests.set(requestKey, request$);
+    return request$;
   }
 
   /**
@@ -162,31 +187,40 @@ export class ImageService {
       })),
     ];
 
-    // Chain tasks sequentially, emitting updated package snapshots
     return new Observable<CasePackage>((observer) => {
       let current = casePackage;
-      let i = 0;
+      const subscription = from(tasks)
+        .pipe(
+          mergeMap(
+            (task) =>
+              this.generateImage(task.prompt, caseId, task.entityType, task.entityId).pipe(
+                catchError(() => of(this.buildCssPlaceholder(task.prompt))),
+                map((url) => ({ task, url })),
+              ),
+            IMAGE_BATCH_CONCURRENCY,
+          ),
+        )
+        .subscribe({
+          next: ({ task, url }) => {
+            current = task.apply(current, url);
+            observer.next(current);
+          },
+          error: (error) => observer.error(error),
+          complete: () => observer.complete(),
+        });
 
-      const processNext = () => {
-        if (i >= tasks.length) {
-          observer.complete();
-          return;
-        }
-        const task = tasks[i++];
-        this.generateImage(task.prompt, caseId, task.entityType, task.entityId)
-          .pipe(catchError(() => of(this.buildCssPlaceholder(task.prompt))))
-          .subscribe({
-            next: (url) => {
-              current = task.apply(current, url);
-              observer.next(current);
-              processNext();
-            },
-            error: () => processNext(), // skip broken tasks
-          });
-      };
-
-      processNext();
+      return () => subscription.unsubscribe();
     });
+  }
+
+  private getSafePrompt(originalPrompt: string): Observable<string> {
+    const cacheKey = hashPrompt(`${SAFE_PROMPT_VERSION}:${originalPrompt}`);
+    const cachedPrompt = this.safePromptCache.get(cacheKey);
+    if (cachedPrompt) return cachedPrompt;
+
+    const prompt$ = this.llm.createSafeImagePrompt(originalPrompt).pipe(shareReplay(1));
+    this.safePromptCache.set(cacheKey, prompt$);
+    return prompt$;
   }
 
   // ---------------------------------------------------------------------------
@@ -200,8 +234,11 @@ export class ImageService {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt, width: dims.width, height: dims.height }),
-      }).then((res) => {
-        if (!res.ok) throw new Error(`Worker error: ${res.status}`);
+      }).then(async (res) => {
+        if (!res.ok) {
+          const body = await res.text().catch(() => '');
+          throw new Error(`Worker error: ${res.status} ${body}`);
+        }
         return res.blob();
       }),
     );

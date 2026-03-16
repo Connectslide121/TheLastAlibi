@@ -22,6 +22,8 @@ import {
   Hint,
 } from '../../models';
 
+type UnlockSpotlight = { kind: 'clue'; clue: Clue } | { kind: 'suspect'; suspect: Suspect };
+
 @Component({
   selector: 'app-investigation-view',
   standalone: true,
@@ -128,6 +130,7 @@ import {
             <app-suspect-card
               [suspect]="suspect"
               [isInterviewed]="isInterviewed(suspect.id)"
+              [variant]="'compact'"
               (cardClicked)="onSuspectClicked(suspect)"
             />
           }
@@ -357,6 +360,130 @@ import {
         />
       }
 
+      @if (unlockSpotlight()) {
+        <div
+          class="fixed inset-0 z-75 flex items-center justify-center p-4"
+          style="background: rgba(0,0,0,0.82)"
+          (click)="dismissUnlockSpotlight()"
+        >
+          <div
+            class="w-full max-w-xl rounded-xl overflow-hidden"
+            style="background: var(--color-secondary); border: var(--border-style); box-shadow: var(--shadow-style); animation: fadeIn 0.22s ease both"
+            (click)="$event.stopPropagation()"
+          >
+            <div
+              class="px-6 py-4 flex items-center gap-3"
+              style="background: linear-gradient(135deg, rgba(201,168,76,0.18), rgba(201,168,76,0.05)); border-bottom: var(--border-style)"
+            >
+              <span class="material-icons mi-xl text-(--color-accent)">
+                {{ unlockSpotlight()!.kind === 'clue' ? 'workspace_premium' : 'person_add' }}
+              </span>
+              <div class="flex-1">
+                <p
+                  class="font-mono text-xs uppercase tracking-widest"
+                  style="color: var(--color-text-muted)"
+                >
+                  {{
+                    unlockSpotlight()!.kind === 'clue'
+                      ? 'New Evidence Logged'
+                      : 'New Suspect Unlocked'
+                  }}
+                </p>
+                <h3 class="font-heading text-2xl mt-1" style="color: var(--color-accent)">
+                  {{
+                    unlockSpotlight()!.kind === 'clue'
+                      ? currentSpotlightClue()!.name
+                      : currentSpotlightSuspect()!.name
+                  }}
+                </h3>
+              </div>
+              <button
+                type="button"
+                (click)="dismissUnlockSpotlight()"
+                class="p-1.5 rounded opacity-60 hover:opacity-100 cursor-pointer transition-opacity"
+                style="color: var(--color-text)"
+              >
+                <span class="material-icons">close</span>
+              </button>
+            </div>
+
+            <div class="p-6 flex flex-col gap-5">
+              @if (unlockSpotlight()!.kind === 'clue') {
+                <div class="grid grid-cols-1 md:grid-cols-[220px_1fr] gap-5 items-start">
+                  <app-clue-card
+                    [clue]="currentSpotlightClue()!"
+                    [showTruth]="true"
+                    [variant]="'preview'"
+                  />
+                  <div class="flex flex-col gap-4">
+                    <p class="text-sm leading-relaxed" style="color: var(--color-text)">
+                      {{ currentSpotlightClue()!.description }}
+                    </p>
+                    <div
+                      class="rounded-lg p-4"
+                      style="background: var(--color-surface); border: var(--border-style)"
+                    >
+                      <p
+                        class="font-mono text-xs uppercase tracking-widest mb-2"
+                        style="color: var(--color-accent)"
+                      >
+                        Why It Matters
+                      </p>
+                      <p class="text-sm leading-relaxed italic" style="color: var(--color-text)">
+                        {{ currentSpotlightClue()!.revealsInfo }}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              } @else {
+                <div class="grid grid-cols-1 md:grid-cols-[220px_1fr] gap-5 items-start">
+                  <app-suspect-card
+                    [suspect]="currentSpotlightSuspect()!"
+                    [isInterviewed]="isInterviewed(currentSpotlightSuspect()!.id)"
+                    [variant]="'preview'"
+                    (cardClicked)="onSuspectClicked($event)"
+                  />
+                  <div class="flex flex-col gap-4">
+                    <p class="font-mono text-sm" style="color: var(--color-text-muted)">
+                      {{ currentSpotlightSuspect()!.occupation }} ·
+                      {{ currentSpotlightSuspect()!.relationship }}
+                    </p>
+                    <p class="text-sm leading-relaxed" style="color: var(--color-text)">
+                      {{ currentSpotlightSuspect()!.description }}
+                    </p>
+                    <div
+                      class="rounded-lg p-4"
+                      style="background: var(--color-surface); border: var(--border-style)"
+                    >
+                      <p
+                        class="font-mono text-xs uppercase tracking-widest mb-2"
+                        style="color: var(--color-accent)"
+                      >
+                        First Read
+                      </p>
+                      <p class="text-sm leading-relaxed" style="color: var(--color-text)">
+                        {{ currentSpotlightSuspect()!.personality }}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              }
+
+              <div class="flex justify-end">
+                <button
+                  type="button"
+                  (click)="dismissUnlockSpotlight()"
+                  class="px-5 py-2 rounded border font-mono text-xs uppercase tracking-widest cursor-pointer hover:opacity-85 transition-opacity"
+                  style="border-color: var(--color-accent); color: var(--color-accent)"
+                >
+                  Continue
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      }
+
       <!-- ===== Case File Drawer ===== -->
       @if (caseFileOpen()) {
         <!-- Backdrop -->
@@ -389,7 +516,7 @@ import {
 
           <!-- Tabs -->
           <div class="flex shrink-0 px-5 gap-1 pt-3" style="border-bottom: var(--border-style)">
-            @for (tab of caseFileTabs; track tab.id) {
+            @for (tab of caseFileTabs(); track tab.id) {
               <button
                 type="button"
                 (click)="caseFileTab.set(tab.id)"
@@ -500,19 +627,37 @@ import {
             }
 
             <!-- TIMELINE TAB -->
-            @if (caseFileTab() === 'timeline') {
-              @if ((casePackage()?.timeline ?? []).length === 0) {
+            @if (isTimelineUnlocked() && caseFileTab() === 'timeline') {
+              <div
+                class="rounded-lg p-4 mb-4"
+                style="background: var(--color-surface); border: var(--border-style)"
+              >
+                <p
+                  class="font-mono text-xs uppercase tracking-widest mb-2 flex items-center gap-1.5"
+                  style="color: var(--color-accent)"
+                >
+                  <span class="material-icons" style="font-size: 0.9rem">info</span>
+                  Working Timeline
+                </p>
+                <p
+                  class="text-sm leading-relaxed"
+                  style="font-family: var(--font-body); color: var(--color-text)"
+                >
+                  {{ timelineTabIntro() }}
+                </p>
+              </div>
+              @if (visibleTimelineEvents().length === 0) {
                 <div class="flex flex-col items-center gap-3 py-12 opacity-50">
                   <span class="material-icons text-5xl" style="color: var(--color-text-muted)"
                     >schedule</span
                   >
                   <p class="font-mono text-sm" style="color: var(--color-text-muted)">
-                    Timeline not yet available.
+                    Timeline entries unlock as you complete investigations.
                   </p>
                 </div>
               }
               <div class="flex flex-col gap-0">
-                @for (event of casePackage()?.timeline ?? []; track event.id; let last = $last) {
+                @for (event of visibleTimelineEvents(); track event.id; let last = $last) {
                   <div class="flex gap-3">
                     <!-- Timeline spine -->
                     <div class="flex flex-col items-center shrink-0">
@@ -541,6 +686,176 @@ import {
                     </div>
                   </div>
                 }
+              </div>
+            }
+
+            <!-- ARCHIVE TAB -->
+            @if (caseFileTab() === 'archive') {
+              <div class="flex flex-col gap-5">
+                <div
+                  class="rounded-lg p-4"
+                  style="background: var(--color-surface); border: var(--border-style)"
+                >
+                  <p
+                    class="font-mono text-xs uppercase tracking-widest mb-2 flex items-center gap-1.5"
+                    style="color: var(--color-accent)"
+                  >
+                    <span class="material-icons" style="font-size: 0.9rem">history</span>
+                    Investigation Archive
+                  </p>
+                  <p
+                    class="text-sm leading-relaxed"
+                    style="font-family: var(--font-body); color: var(--color-text)"
+                  >
+                    Revisit completed scenes, interviews, puzzles, and deductions without changing
+                    progression.
+                  </p>
+                </div>
+
+                <div class="flex flex-col gap-3">
+                  <h3
+                    class="font-mono text-xs uppercase tracking-widest"
+                    style="color: var(--color-text-muted)"
+                  >
+                    Completed Events
+                  </h3>
+                  @if (completedFieldEvents().length === 0) {
+                    <p class="text-sm italic" style="color: var(--color-text-muted)">
+                      No completed field events yet.
+                    </p>
+                  }
+                  @for (event of completedFieldEvents(); track event.id) {
+                    <button
+                      type="button"
+                      (click)="revisitEvent(event)"
+                      class="text-left p-4 rounded-lg border cursor-pointer transition-opacity hover:opacity-90"
+                      style="background: var(--color-surface); border-color: rgba(201,168,76,0.2);"
+                    >
+                      <div class="flex items-start gap-3">
+                        <span class="material-icons mi-lg text-(--color-accent) opacity-70">{{
+                          categoryIcon(event.category)
+                        }}</span>
+                        <div class="flex-1 min-w-0">
+                          <div class="flex items-center gap-2 flex-wrap">
+                            <h4 class="font-heading text-(--color-accent)">{{ event.title }}</h4>
+                            <span
+                              class="font-mono text-[10px] uppercase tracking-widest px-2 py-0.5 rounded"
+                              style="background: rgba(201,168,76,0.12); color: var(--color-text-muted)"
+                            >
+                              Act {{ event.act }}
+                            </span>
+                          </div>
+                          <p class="text-sm mt-1" style="color: var(--color-text); opacity: 0.8">
+                            {{ event.description }}
+                          </p>
+                        </div>
+                        <span
+                          class="material-icons mi-sm shrink-0"
+                          style="color: var(--color-accent)"
+                        >
+                          replay
+                        </span>
+                      </div>
+                    </button>
+                  }
+                </div>
+
+                <div class="flex flex-col gap-3">
+                  <h3
+                    class="font-mono text-xs uppercase tracking-widest"
+                    style="color: var(--color-text-muted)"
+                  >
+                    Interview Records
+                  </h3>
+                  @if (completedInterviews().length === 0) {
+                    <p class="text-sm italic" style="color: var(--color-text-muted)">
+                      No completed interviews yet.
+                    </p>
+                  }
+                  @for (event of completedInterviews(); track event.id) {
+                    <button
+                      type="button"
+                      (click)="revisitEvent(event)"
+                      class="text-left p-4 rounded-lg border cursor-pointer transition-opacity hover:opacity-90"
+                      style="background: var(--color-surface); border-color: rgba(201,168,76,0.2);"
+                    >
+                      <div class="flex items-start gap-3">
+                        <span class="material-icons mi-lg text-(--color-accent) opacity-70"
+                          >record_voice_over</span
+                        >
+                        <div class="flex-1 min-w-0">
+                          <div class="flex items-center gap-2 flex-wrap">
+                            <h4 class="font-heading text-(--color-accent)">{{ event.title }}</h4>
+                            <span
+                              class="font-mono text-[10px] uppercase tracking-widest px-2 py-0.5 rounded"
+                              style="background: rgba(201,168,76,0.12); color: var(--color-text-muted)"
+                            >
+                              {{ suspectName(event.dialogueSuspectId) }}
+                            </span>
+                          </div>
+                          <p class="text-sm mt-1" style="color: var(--color-text); opacity: 0.8">
+                            {{ event.description }}
+                          </p>
+                        </div>
+                        <span
+                          class="material-icons mi-sm shrink-0"
+                          style="color: var(--color-accent)"
+                        >
+                          replay
+                        </span>
+                      </div>
+                    </button>
+                  }
+                </div>
+
+                <div class="flex flex-col gap-3">
+                  <h3
+                    class="font-mono text-xs uppercase tracking-widest"
+                    style="color: var(--color-text-muted)"
+                  >
+                    Evidence Log
+                  </h3>
+                  @if (archiveClues().length === 0) {
+                    <p class="text-sm italic" style="color: var(--color-text-muted)">
+                      No clues logged yet.
+                    </p>
+                  }
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    @for (clue of archiveClues(); track clue.id) {
+                      <button
+                        type="button"
+                        class="text-left cursor-pointer hover:opacity-90 transition-opacity"
+                        (click)="onClueClicked(clue)"
+                      >
+                        <app-clue-card [clue]="clue" [showTruth]="false" />
+                      </button>
+                    }
+                  </div>
+                </div>
+
+                <div class="flex flex-col gap-3">
+                  <h3
+                    class="font-mono text-xs uppercase tracking-widest"
+                    style="color: var(--color-text-muted)"
+                  >
+                    Suspect Dossier
+                  </h3>
+                  @if (archiveSuspects().length === 0) {
+                    <p class="text-sm italic" style="color: var(--color-text-muted)">
+                      No suspects logged yet.
+                    </p>
+                  }
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    @for (suspect of archiveSuspects(); track suspect.id) {
+                      <app-suspect-card
+                        [suspect]="suspect"
+                        [isInterviewed]="isInterviewed(suspect.id)"
+                        [variant]="'expanded'"
+                        (cardClicked)="onSuspectClicked($event)"
+                      />
+                    }
+                  </div>
+                </div>
               </div>
             }
           </div>
@@ -606,6 +921,22 @@ import {
               >
                 {{ expandedSuspect()!.description }}
               </p>
+              <div
+                class="rounded p-4 flex flex-col gap-2"
+                style="background: var(--color-surface); border: var(--border-style)"
+              >
+                <span
+                  class="font-mono text-xs uppercase tracking-widest"
+                  style="color: var(--color-accent)"
+                  >Personality</span
+                >
+                <p
+                  class="text-sm leading-relaxed"
+                  style="font-family: var(--font-body); color: var(--color-text)"
+                >
+                  {{ expandedSuspect()!.personality }}
+                </p>
+              </div>
               @if (isInterviewed(expandedSuspect()!.id)) {
                 <div
                   class="rounded p-4 flex flex-col gap-2"
@@ -633,14 +964,6 @@ import {
                 >
                   <span class="material-icons mi-sm">record_voice_over</span>
                   Interview
-                </button>
-                <button
-                  type="button"
-                  (click)="expandedSuspect.set(null)"
-                  class="py-2.5 px-4 rounded font-mono text-xs uppercase tracking-widest cursor-pointer transition-opacity hover:opacity-80"
-                  style="border: var(--border-style); color: var(--color-text-muted)"
-                >
-                  Close
                 </button>
               </div>
             </div>
@@ -728,14 +1051,6 @@ import {
                 >
                 Found at: {{ clueLocationName(expandedClue()!.locationId) }}
               </p>
-              <button
-                type="button"
-                (click)="expandedClue.set(null)"
-                class="w-full py-2.5 rounded font-mono text-xs uppercase tracking-widest cursor-pointer transition-opacity hover:opacity-80"
-                style="border: var(--border-style); color: var(--color-text-muted)"
-              >
-                Close
-              </button>
             </div>
           </div>
         </div>
@@ -797,12 +1112,16 @@ export class InvestigationView implements OnInit {
   readonly sidebarOpen = signal(true);
   readonly activeHint = signal<Hint | null>(null);
   readonly caseFileOpen = signal(false);
-  readonly caseFileTab = signal<'briefing' | 'evidence' | 'suspects' | 'timeline'>('briefing');
+  readonly caseFileTab = signal<'briefing' | 'timeline' | 'archive'>('briefing');
   readonly expandedSuspect = signal<Suspect | null>(null);
   readonly expandedClue = signal<Clue | null>(null);
+  readonly replayingEventId = signal<string | null>(null);
+  readonly unlockSpotlight = signal<UnlockSpotlight | null>(null);
 
   readonly gameState = this.gsvc.state;
   readonly isAccusationUnlocked = this.gsvc.isAccusationUnlocked;
+
+  private readonly unlockSpotlightQueue: UnlockSpotlight[] = [];
 
   readonly availableEvents = computed((): InvestigationEvent[] => {
     const pkg = this.casePackage();
@@ -850,6 +1169,45 @@ export class InvestigationView implements OnInit {
     return pkg.clues.filter((c) => ids.includes(c.id));
   });
 
+  readonly completedEvents = computed((): InvestigationEvent[] => {
+    const pkg = this.casePackage();
+    const state = this.gameState();
+    if (!pkg || !state) return [];
+    return pkg.eventGraph.filter((event) => state.completedEventIds.includes(event.id));
+  });
+
+  readonly completedInterviews = computed((): InvestigationEvent[] => {
+    return this.completedEvents().filter((event) => !!event.dialogueSuspectId);
+  });
+
+  readonly completedFieldEvents = computed((): InvestigationEvent[] => {
+    return this.completedEvents().filter((event) => !event.dialogueSuspectId);
+  });
+
+  readonly archiveClues = computed((): Clue[] => {
+    const pkg = this.casePackage();
+    const state = this.gameState();
+    if (!pkg || !state) return [];
+    return pkg.clues.filter((clue) => state.foundClueIds.includes(clue.id));
+  });
+
+  readonly archiveSuspects = computed((): Suspect[] => {
+    const pkg = this.casePackage();
+    const state = this.gameState();
+    if (!pkg || !state) return [];
+    return pkg.suspects.filter((suspect) => state.unlockedSuspectIds.includes(suspect.id));
+  });
+
+  readonly currentSpotlightClue = computed((): Clue | null => {
+    const spotlight = this.unlockSpotlight();
+    return spotlight?.kind === 'clue' ? spotlight.clue : null;
+  });
+
+  readonly currentSpotlightSuspect = computed((): Suspect | null => {
+    const spotlight = this.unlockSpotlight();
+    return spotlight?.kind === 'suspect' ? spotlight.suspect : null;
+  });
+
   readonly actProgressPercent = computed((): number => {
     const pkg = this.casePackage();
     const state = this.gameState();
@@ -869,10 +1227,26 @@ export class InvestigationView implements OnInit {
 
   readonly hasMoreHints = computed(() => this.hintsRemaining() > 0);
 
-  readonly caseFileTabs = [
-    { id: 'briefing' as const, label: 'Briefing', icon: 'description' },
-    { id: 'timeline' as const, label: 'Timeline', icon: 'schedule' },
-  ];
+  readonly isTimelineUnlocked = computed(
+    () => (this.gameState()?.completedEventIds.length ?? 0) > 0,
+  );
+
+  readonly caseFileTabs = computed(() => {
+    const tabs: Array<{
+      id: 'briefing' | 'timeline' | 'archive';
+      label: string;
+      icon: string;
+    }> = [
+      { id: 'briefing' as const, label: 'Briefing', icon: 'description' },
+      { id: 'archive' as const, label: 'Archive', icon: 'inventory' },
+    ];
+
+    if (this.isTimelineUnlocked()) {
+      tabs.splice(1, 0, { id: 'timeline' as const, label: 'Case Timeline', icon: 'schedule' });
+    }
+
+    return tabs;
+  });
 
   readonly briefingActPreviews = computed(() => {
     const m = this.casePackage()?.metadata;
@@ -888,8 +1262,32 @@ export class InvestigationView implements OnInit {
     return all.slice(0, currentAct);
   });
 
+  readonly visibleTimelineEvents = computed(() => {
+    const pkg = this.casePackage();
+    const completedCount = this.gameState()?.completedEventIds.length ?? 0;
+    if (!pkg || completedCount === 0) return [];
+    return pkg.timeline.slice(0, Math.min(pkg.timeline.length, completedCount));
+  });
+
+  readonly timelineTabIntro = computed(() => {
+    const visible = this.visibleTimelineEvents().length;
+    const total = this.casePackage()?.timeline.length ?? 0;
+    return (
+      'This is your working case chronology: witness accounts, reported movements, and known events around the crime. ' +
+      'More entries unlock as you complete investigations. ' +
+      `${visible} of ${total} entries discovered so far.`
+    );
+  });
+
   clueLocationName(locationId: string): string {
     return this.casePackage()?.locations.find((l) => l.id === locationId)?.name ?? locationId;
+  }
+
+  suspectName(suspectId: string | undefined): string {
+    if (!suspectId) return 'Unknown suspect';
+    return (
+      this.casePackage()?.suspects.find((suspect) => suspect.id === suspectId)?.name ?? suspectId
+    );
   }
 
   ngOnInit(): void {
@@ -937,6 +1335,7 @@ export class InvestigationView implements OnInit {
   }
 
   selectEvent(event: InvestigationEvent): void {
+    this.replayingEventId.set(null);
     this.selectedEvent.set(event);
     this.recentClueIds.set([]);
 
@@ -951,26 +1350,46 @@ export class InvestigationView implements OnInit {
     }
   }
 
+  revisitEvent(event: InvestigationEvent): void {
+    this.caseFileOpen.set(false);
+    this.replayingEventId.set(event.id);
+    this.selectedEvent.set(event);
+    this.recentClueIds.set([]);
+
+    if (event.dialogueSuspectId) {
+      const suspect = this.casePackage()?.suspects.find((s) => s.id === event.dialogueSuspectId);
+      this.activeDialogueLines.set(suspect?.interviewDialogue ?? []);
+      return;
+    }
+
+    this.activeDialogueLines.set([]);
+  }
+
   onDialogueClosed(): void {
     const event = this.selectedEvent();
-    if (event) this.completeCurrentEvent(event);
+    if (event && !this.isReplayingEvent(event.id)) this.completeCurrentEvent(event);
     this.activeDialogueLines.set([]);
+    this.replayingEventId.set(null);
     this.selectedEvent.set(null);
   }
 
   onPuzzleSolved(clueId: string): void {
     const event = this.selectedEvent();
     if (event) {
-      if (clueId) this.gsvc.discoverClue(clueId);
-      this.completeCurrentEvent(event);
+      if (!this.isReplayingEvent(event.id)) {
+        if (clueId) this.gsvc.discoverClue(clueId);
+        this.completeCurrentEvent(event);
+      }
     }
+    this.replayingEventId.set(null);
     this.selectedEvent.set(null);
   }
 
   finishNarration(): void {
     const event = this.selectedEvent();
-    if (event) this.completeCurrentEvent(event);
+    if (event && !this.isReplayingEvent(event.id)) this.completeCurrentEvent(event);
     this.recentClueIds.set([]);
+    this.replayingEventId.set(null);
     this.selectedEvent.set(null);
   }
 
@@ -985,6 +1404,14 @@ export class InvestigationView implements OnInit {
     );
     if (available) {
       this.selectEvent(available);
+      return;
+    }
+
+    const completedInterview = this.completedInterviews().find(
+      (event) => event.dialogueSuspectId === suspect.id,
+    );
+    if (completedInterview) {
+      this.revisitEvent(completedInterview);
     } else {
       this.toast.show(`Nothing new to ask ${suspect.name} right now.`, 'info');
     }
@@ -1042,6 +1469,20 @@ export class InvestigationView implements OnInit {
   }
 
   private completeCurrentEvent(event: InvestigationEvent): void {
+    const pkg = this.casePackage();
+    const state = this.gsvc.state();
+    if (!pkg || !state) return;
+
+    const newlyFoundClues = event.rewardsClueIds
+      .filter((id) => !state.foundClueIds.includes(id))
+      .map((id) => pkg.clues.find((clue) => clue.id === id))
+      .filter((clue): clue is Clue => !!clue);
+
+    const newlyUnlockedSuspects = event.unlocksSuspectIds
+      .filter((id) => !state.unlockedSuspectIds.includes(id))
+      .map((id) => pkg.suspects.find((suspect) => suspect.id === id))
+      .filter((suspect): suspect is Suspect => !!suspect);
+
     this.gsvc.completeEvent(event.id);
 
     const clueIds: string[] = [];
@@ -1055,7 +1496,31 @@ export class InvestigationView implements OnInit {
       this.recentClueIds.set(clueIds);
     }
 
+    this.enqueueUnlockSpotlights(newlyFoundClues, newlyUnlockedSuspects);
+
     this.checkActProgression();
+  }
+
+  dismissUnlockSpotlight(): void {
+    const next = this.unlockSpotlightQueue.shift() ?? null;
+    this.unlockSpotlight.set(next);
+  }
+
+  private isReplayingEvent(eventId: string): boolean {
+    return this.replayingEventId() === eventId;
+  }
+
+  private enqueueUnlockSpotlights(clues: Clue[], suspects: Suspect[]): void {
+    for (const clue of clues) {
+      this.unlockSpotlightQueue.push({ kind: 'clue', clue });
+    }
+    for (const suspect of suspects) {
+      this.unlockSpotlightQueue.push({ kind: 'suspect', suspect });
+    }
+
+    if (!this.unlockSpotlight()) {
+      this.dismissUnlockSpotlight();
+    }
   }
 
   private checkActProgression(): void {

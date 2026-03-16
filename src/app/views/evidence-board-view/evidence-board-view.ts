@@ -326,14 +326,6 @@ const CARD_H = 130; // approx card height for midpoint calc
                   </p>
                 </div>
               }
-              <button
-                type="button"
-                (click)="expandedSuspect.set(null)"
-                class="w-full py-2.5 rounded font-mono text-xs uppercase tracking-widest cursor-pointer transition-opacity hover:opacity-80"
-                style="border: var(--border-style); color: var(--color-text-muted)"
-              >
-                Close
-              </button>
             </div>
           </div>
         </div>
@@ -416,14 +408,6 @@ const CARD_H = 130; // approx card height for midpoint calc
                 >
                 Found at: {{ clueLocationName(expandedClue()!.locationId) }}
               </p>
-              <button
-                type="button"
-                (click)="expandedClue.set(null)"
-                class="w-full py-2.5 rounded font-mono text-xs uppercase tracking-widest cursor-pointer transition-opacity hover:opacity-80"
-                style="border: var(--border-style); color: var(--color-text-muted)"
-              >
-                Close
-              </button>
             </div>
           </div>
         </div>

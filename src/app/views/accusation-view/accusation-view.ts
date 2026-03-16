@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { CaseStoreService } from '../../services/case-store.service';
 import { GameStateService } from '../../services/game-state.service';
+import { ImageService } from '../../services/image.service';
 import { CasePackage, Suspect, Clue, FinalAccusation } from '../../models';
 
 @Component({
@@ -92,7 +93,8 @@ import { CasePackage, Suspect, Clue, FinalAccusation } from '../../models';
               What was their motive?
             </label>
             <textarea
-              [(ngModel)]="motive"
+              [ngModel]="motive()"
+              (ngModelChange)="motive.set($event)"
               rows="3"
               placeholder="Describe why you believe they did it…"
               class="w-full rounded-lg p-3 font-body text-sm text-(--color-text) resize-none outline-none focus:ring-1"
@@ -108,7 +110,8 @@ import { CasePackage, Suspect, Clue, FinalAccusation } from '../../models';
               How was it done?
             </label>
             <textarea
-              [(ngModel)]="method"
+              [ngModel]="method()"
+              (ngModelChange)="method.set($event)"
               rows="3"
               placeholder="Describe the method used…"
               class="w-full rounded-lg p-3 font-body text-sm text-(--color-text) resize-none outline-none focus:ring-1"
@@ -157,6 +160,10 @@ import { CasePackage, Suspect, Clue, FinalAccusation } from '../../models';
             <span class="material-icons mi-sm">gavel</span>
             Submit My Theory
           </button>
+          <p class="mt-3 text-xs font-mono text-(--color-text-muted)">
+            Submission unlocks after you choose a suspect and enter both a motive and a method. The
+            game checks whether you're correct only after you submit.
+          </p>
         </div>
       }
 
@@ -207,15 +214,15 @@ export class AccusationView implements OnInit {
   private readonly router = inject(Router);
   private readonly caseStore = inject(CaseStoreService);
   private readonly gsvc = inject(GameStateService);
+  private readonly imageService = inject(ImageService);
 
   readonly isLoading = signal(true);
   readonly casePackage = signal<CasePackage | null>(null);
   readonly selectedCulpritId = signal('');
   readonly selectedEvidenceIds = signal<string[]>([]);
   readonly showConfirmation = signal(false);
-
-  motive = '';
-  method = '';
+  readonly motive = signal('');
+  readonly method = signal('');
 
   readonly gameState = this.gsvc.state;
 
@@ -235,7 +242,9 @@ export class AccusationView implements OnInit {
 
   readonly canSubmit = computed(
     () =>
-      !!this.selectedCulpritId() && this.motive.trim().length > 0 && this.method.trim().length > 0,
+      !!this.selectedCulpritId() &&
+      this.motive().trim().length > 0 &&
+      this.method().trim().length > 0,
   );
 
   readonly selectedSuspectName = computed(() => {
@@ -256,6 +265,11 @@ export class AccusationView implements OnInit {
       }
       this.casePackage.set(pkg);
       this.isLoading.set(false);
+
+      // Re-hydrate blob URLs from IndexedDB so portrait choices render after navigation or refresh.
+      this.imageService.generateAllCaseImages(pkg).subscribe({
+        next: (updated) => this.casePackage.set(updated),
+      });
     });
   }
 
@@ -279,8 +293,8 @@ export class AccusationView implements OnInit {
 
     const accusation: FinalAccusation = {
       culpritId: this.selectedCulpritId(),
-      motive: this.motive.trim(),
-      method: this.method.trim(),
+      motive: this.motive().trim(),
+      method: this.method().trim(),
       evidenceIds: this.selectedEvidenceIds(),
     };
 

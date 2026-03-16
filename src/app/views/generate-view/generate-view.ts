@@ -230,19 +230,15 @@ export class GenerateView implements OnInit {
         this.caseStore.storeCase(pkg).subscribe(() => {
           this.gameState.initState(pkg.id);
           this.readyPkg.set(pkg);
+          this.phase.set('briefing');
 
-          // Drive the final image-generation step in the loading screen
+          // Continue loading images in the background so the briefing is usable immediately.
           this.llm.markImageStepActive();
           this.imageService.generateAllCaseImages(pkg).subscribe({
             next: (updated) => this.readyPkg.set(updated),
-            complete: () => {
-              this.llm.markImageStepDone();
-              this.phase.set('briefing');
-            },
+            complete: () => this.llm.markImageStepDone(),
             error: () => {
-              // Images failed — still show briefing without them
               this.llm.markImageStepDone();
-              this.phase.set('briefing');
             },
           });
         });

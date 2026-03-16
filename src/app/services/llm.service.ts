@@ -1,9 +1,7 @@
 ﻿import { Injectable, inject, signal } from '@angular/core';
-import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Observable, forkJoin, of, throwError } from 'rxjs';
 import { catchError, map, switchMap } from 'rxjs/operators';
 
-import { environment } from '../../environments/environment';
 import {
   CasePackage,
   CaseMetadata,
@@ -21,6 +19,7 @@ import {
   UITheme,
   ImagePromptTemplates,
 } from '../models';
+import { WorkerLlmService } from './worker-llm';
 
 type Difficulty = CaseMetadata['difficulty'];
 
@@ -79,14 +78,18 @@ interface EventSpec {
   narration: string;
 }
 
-interface PuzzleSpec {
+interface PuzzleConcept {
   label: string;
   id: string;
-  type: PuzzleEvent['type'];
-  title: string;
-  description: string;
-  solutionCondition: string;
   rewardedClueId: string;
+  puzzleTitle: string;
+  puzzleType: PuzzleEvent['type'];
+  puzzleDescription: string;
+  puzzleLogic: string;
+  clues: string[];
+  solution: string;
+  validationLogic: string;
+  uiConcept: string;
   hints: string[];
 }
 
@@ -112,7 +115,7 @@ interface GenCtx {
   visual: VisualResult;
   timeline: TimelineEvent[];
   events: EventSpec[];
-  puzzleSpecs: PuzzleSpec[];
+  puzzleConcepts: PuzzleConcept[];
   hintsAndSolution: HintResult;
   puzzles: PuzzleEvent[];
 }
@@ -123,6 +126,12 @@ export interface GenerationStepStatus {
   status: 'pending' | 'active' | 'done' | 'error';
 }
 
+interface LlmCallOptions {
+  systemPrompt?: string;
+  maxTokens?: number;
+  temperature?: number;
+}
+
 const STEP_DEFS: Omit<GenerationStepStatus, 'status'>[] = [
   { label: 'Case Foundation', detail: 'Setting, premise, culprit & motive' },
   { label: 'Suspects', detail: 'Character profiles & interview dialogue' },
@@ -131,7 +140,7 @@ const STEP_DEFS: Omit<GenerationStepStatus, 'status'>[] = [
   { label: 'Visual Theme', detail: 'Colour palette, art style & UI skin' },
   { label: 'Timeline', detail: '10-entry chronological event log' },
   { label: 'Investigation Events', detail: 'Interactive event graph across 3 acts' },
-  { label: 'Puzzle Specs', detail: 'Puzzle designs & solution conditions' },
+  { label: 'Puzzle Concepts', detail: 'Puzzle logic, clues & intended solution' },
   { label: 'Hint Ladder', detail: 'Progressive hints & solution narrative' },
   { label: 'Puzzle Components', detail: 'Self-contained interactive HTML puzzles' },
   { label: 'Final Assembly', detail: 'Stitching all pieces into the case file' },
@@ -144,7 +153,7 @@ function makeSteps(): GenerationStepStatus[] {
 
 @Injectable({ providedIn: 'root' })
 export class LlmService {
-  private readonly http = inject(HttpClient);
+  private readonly workerLlm = inject(WorkerLlmService);
 
   readonly generationSteps = signal<GenerationStepStatus[]>(makeSteps());
 
@@ -236,7 +245,7 @@ export class LlmService {
       }),
       switchMap((ctx) => {
         return forkJoin({
-          puzzleSpecs: this.step7PuzzleSpecs(ctx.foundation, ctx.clues, ctx.events),
+          puzzleConcepts: this.step7PuzzleConcepts(ctx.foundation, ctx.clues, ctx.events),
           hintsAndSolution: this.step8HintsAndSolution(
             ctx.foundation,
             ctx.suspects,
@@ -252,12 +261,14 @@ export class LlmService {
         );
       }),
       switchMap((ctx) => {
-        if (ctx.puzzleSpecs.length === 0) {
+        if (ctx.puzzleConcepts.length === 0) {
           this.markDone(9);
           return of({ ...ctx, puzzles: [] as PuzzleEvent[] });
         }
         return forkJoin(
-          ctx.puzzleSpecs.map((spec) => this.step7bPuzzleHtml(spec, ctx.style, ctx.visual.uiTheme)),
+          ctx.puzzleConcepts.map((concept) =>
+            this.step7bPuzzleHtml(concept, ctx.style, ctx.visual.uiTheme),
+          ),
         ).pipe(
           map((puzzles) => {
             this.markDone(9);
@@ -294,11 +305,14 @@ export class LlmService {
     };
 
     const seed = Math.floor(Math.random() * 1_000_000);
+    const caseTypes = ['murder', 'theft', 'disappearance', 'sabotage', 'other'] as const;
+    const caseType = caseTypes[Math.floor(Math.random() * caseTypes.length)];
     const prompt =
       `You are designing a UNIQUE detective mystery for an interactive game called "The Last Alibi".\n` +
       `DIFFICULTY: ${difficulty} \u2014 ${guide[difficulty]}\n` +
       `ART STYLE: ${style}\n` +
-      `CREATIVITY SEED: ${seed} \u2014 use this to produce a completely original, unexpected scenario.\n\n` +
+      `CREATIVITY SEED: ${seed} \u2014 use this to produce a completely original, unexpected scenario.\n` +
+      `CASE TYPE (fixed): ${caseType} \u2014 the crime MUST be a ${caseType}. Build your entire scenario around this.\n\n` +
       `CRITICAL: Invent a wholly ORIGINAL case. Do NOT use "manor house murder", Victorian settings,\n` +
       `jealous sisters, or any other clich\u00e9. The setting, crime type, era, and cast must be fresh.\n\n` +
       `Output ONLY a raw JSON object. No markdown fences, no explanation.\n` +
@@ -307,7 +321,7 @@ export class LlmService {
       `  "caseSlug": "<your-unique-kebab-slug>",\n` +
       `  "title": "<Your Original Case Title>",\n` +
       `  "subtitle": "<one-line tagline>",\n` +
-      `  "caseType": "<murder|theft|disappearance|sabotage|other>",\n` +
+      `  "caseType": "${caseType}",\n` +
       `  "setting": "<original setting \u2014 era, location, atmosphere>",\n` +
       `  "briefing": "<2-3 sentences the detective reads on arrival>",\n` +
       `  "act1Summary": "<what the player discovers in Act 1>",\n` +
@@ -330,9 +344,12 @@ export class LlmService {
       `- culpritLabel must appear verbatim in suspectLabels\n` +
       `- suspectLabels must have exactly ${suspectCount[difficulty]} entries\n` +
       `- lyingSuspectLabels, mistakenSuspectLabels, hidingSecretSuspectLabels are subsets of suspectLabels\n` +
-      `- caseType must be one of: "murder"|"theft"|"disappearance"|"sabotage"|"other"`;
+      `- caseType is already set to "${caseType}" \u2014 do not change it`;
 
-    return this.callLlm(prompt).pipe(map((raw) => this.parseJson<CaseFoundation>(raw)));
+    return this.callAndParseJson<CaseFoundation>(prompt, {
+      maxTokens: 1800,
+      temperature: 0.8,
+    });
   }
 
   // ---------------------------------------------------------------------------
@@ -385,9 +402,10 @@ export class LlmService {
       `- Each suspect has exactly 4 interviewDialogue entries\n` +
       `- speakerId in each dialogue entry must match that suspect's id`;
 
-    return this.callLlm(prompt).pipe(
-      map((raw) => this.parseJson<{ culpritSuspectId: string; suspects: Suspect[] }>(raw)),
-    );
+    return this.callAndParseJson<{ culpritSuspectId: string; suspects: Suspect[] }>(prompt, {
+      maxTokens: 3200,
+      temperature: 0.8,
+    });
   }
 
   // ---------------------------------------------------------------------------
@@ -412,9 +430,10 @@ export class LlmService {
       `}\n\n` +
       `Generate exactly 5 locations specific to ${f.setting}.`;
 
-    return this.callLlm(prompt).pipe(
-      map((raw) => this.parseJson<{ locations: LocationSpec[] }>(raw).locations),
-    );
+    return this.callAndParseJson<{ locations: LocationSpec[] }>(prompt, {
+      maxTokens: 1600,
+      temperature: 0.7,
+    }).pipe(map((r) => r.locations));
   }
 
   // ---------------------------------------------------------------------------
@@ -461,7 +480,10 @@ export class LlmService {
       `- importantClueId must be in culpritClueIds\n` +
       `- All locationId values must be from the list above`;
 
-    return this.callLlm(prompt).pipe(map((raw) => this.parseJson<CluesResult>(raw)));
+    return this.callAndParseJson<CluesResult>(prompt, {
+      maxTokens: 2400,
+      temperature: 0.75,
+    });
   }
 
   // ---------------------------------------------------------------------------
@@ -494,9 +516,10 @@ export class LlmService {
       `- The actual moment of the crime MUST appear as isTrue: true\n` +
       `- Use only the suspect IDs listed above in involvedSuspectIds`;
 
-    return this.callLlm(prompt).pipe(
-      map((raw) => this.parseJson<{ timeline: TimelineEvent[] }>(raw).timeline),
-    );
+    return this.callAndParseJson<{ timeline: TimelineEvent[] }>(prompt, {
+      maxTokens: 1800,
+      temperature: 0.7,
+    }).pipe(map((r) => r.timeline));
   }
 
   // ---------------------------------------------------------------------------
@@ -561,79 +584,97 @@ export class LlmService {
       `- Do NOT create circular unlock conditions\n` +
       `- Key culprit clues (${clues.culpritClueIds.join(', ')}) should be rewards in Act 2-3 events`;
 
-    return this.callLlm(prompt).pipe(
-      map((raw) => this.parseJson<{ events: EventSpec[] }>(raw).events),
-    );
+    return this.callAndParseJson<{ events: EventSpec[] }>(prompt, {
+      maxTokens: 3200,
+      temperature: 0.75,
+    }).pipe(map((r) => r.events));
   }
 
   // ---------------------------------------------------------------------------
-  // Step 7 â€” Puzzle Specs (no HTML)
+  // Step 7 — Puzzle Concepts (no HTML)
   // ---------------------------------------------------------------------------
 
-  private step7PuzzleSpecs(
+  private step7PuzzleConcepts(
     f: CaseFoundation,
     clues: CluesResult,
     events: EventSpec[],
-  ): Observable<PuzzleSpec[]> {
+  ): Observable<PuzzleConcept[]> {
     const puzzleLabels = events.filter((e) => e.puzzleLabel).map((e) => e.puzzleLabel!);
     if (puzzleLabels.length === 0) return of([]);
 
     const availableClueIds = clues.clues.map((c) => c.id).join(', ');
 
     const prompt =
-      `Generate puzzle specifications for the detective mystery "${f.title}" (${f.setting}).\n` +
-      `Puzzle labels to generate (one spec per label): ${puzzleLabels.join(', ')}\n\n` +
+      `Generate puzzle concepts for the detective mystery "${f.title}" (${f.setting}).\n` +
+      `Puzzle labels to generate (one concept per label): ${puzzleLabels.join(', ')}\n\n` +
       `Available clue IDs for rewards: ${availableClueIds}\n\n` +
+      `Your goal in this step is to ensure each puzzle has real logic, embedded clues, and a clearly intended solution before any HTML is written.\n` +
       `Output ONLY raw JSON. No markdown fences.\n\n` +
       `{\n` +
-      `  "puzzleSpecs": [\n` +
+      `  "puzzleConcepts": [\n` +
       `    {\n` +
       `      "label": "desk-cipher",\n` +
       `      "id": "puzzle-<kebab-case>",\n` +
-      `      "type": "cipher",\n` +
-      `      "title": "The Brass Box Cipher",\n` +
-      `      "description": "what the detective finds and must do, 1-2 sentences",\n` +
-      `      "solutionCondition": "human-readable description of when puzzle is solved",\n` +
       `      "rewardedClueId": "<clue id from the available list above>",\n` +
+      `      "puzzleTitle": "The Brass Box Cipher",\n` +
+      `      "puzzleType": "cipher",\n` +
+      `      "puzzleDescription": "what the player sees and can interact with, 1-2 sentences",\n` +
+      `      "puzzleLogic": "the internal reasoning structure and how the clues lead to the answer",\n` +
+      `      "clues": ["explicit clue the player can inspect", "second clue that supports the logic", "optional third clue"],\n` +
+      `      "solution": "the exact intended answer or final state the player must reach",\n` +
+      `      "validationLogic": "the exact rule the HTML implementation should use to decide the puzzle is solved",\n` +
+      `      "uiConcept": "a short description of the interface layout and interaction style",\n` +
       `      "hints": ["vague hint", "more specific", "points toward solution", "nearly explicit"]\n` +
       `    }\n` +
       `  ]\n` +
       `}\n\n` +
       `Rules:\n` +
-      `- Generate one spec per label: ${puzzleLabels.join(', ')}\n` +
+      `- Generate one concept per label: ${puzzleLabels.join(', ')}\n` +
       `- label field must match the puzzle label exactly\n` +
-      `- type: "cipher"|"lock"|"pattern"|"fragment"|"logic_grid"|"sequence"|"map"|"mechanical"\n` +
+      `- puzzleType: "cipher"|"lock"|"pattern"|"fragment"|"logic_grid"|"sequence"|"map"|"mechanical"\n` +
       `- rewardedClueId must be from the available clue IDs\n` +
+      `- clues must contain 2-5 concrete puzzle clues the player can reason from\n` +
+      `- puzzleLogic must describe how the puzzle actually works, not just its theme\n` +
+      `- solution must be explicit and fully solvable from the clues in the concept\n` +
+      `- validationLogic must clearly define what exact player action or answer counts as solved\n` +
+      `- uiConcept must describe a simple HTML-friendly interface\n` +
+      `- hints must contain 3-5 entries\n` +
       `- Choose puzzle types that fit the ${f.setting} setting`;
 
-    return this.callLlm(prompt).pipe(
-      map((raw) => this.parseJson<{ puzzleSpecs: PuzzleSpec[] }>(raw).puzzleSpecs),
-    );
+    return this.callAndParseJson<{ puzzleConcepts: PuzzleConcept[] }>(prompt, {
+      maxTokens: 2200,
+      temperature: 0.65,
+    }).pipe(map((r) => r.puzzleConcepts));
   }
 
   // ---------------------------------------------------------------------------
-  // Step 7b â€” Puzzle HTML (one call per puzzle)
+  // Step 7b — Puzzle HTML (one call per concept)
   // ---------------------------------------------------------------------------
 
   private step7bPuzzleHtml(
-    spec: PuzzleSpec,
+    concept: PuzzleConcept,
     style: string,
     theme: UITheme,
   ): Observable<PuzzleEvent> {
     const prompt =
-      `Create a self-contained HTML puzzle for a detective mystery game.\n\n` +
-      `Puzzle title: ${spec.title}\n` +
-      `Type: ${spec.type}\n` +
-      `Description: ${spec.description}\n` +
-      `Solution condition: ${spec.solutionCondition}\n` +
-      `Puzzle ID: ${spec.id}\n\n` +
+      `Create a self-contained HTML puzzle for a detective mystery game based on this validated puzzle concept.\n\n` +
+      `Puzzle title: ${concept.puzzleTitle}\n` +
+      `Type: ${concept.puzzleType}\n` +
+      `What the player sees: ${concept.puzzleDescription}\n` +
+      `Puzzle logic: ${concept.puzzleLogic}\n` +
+      `Embedded clues: ${concept.clues.join(' | ')}\n` +
+      `Intended solution: ${concept.solution}\n` +
+      `Validation logic: ${concept.validationLogic}\n` +
+      `UI concept: ${concept.uiConcept}\n` +
+      `Puzzle ID: ${concept.id}\n\n` +
       `Requirements:\n` +
       `- Complete valid HTML document starting with <!DOCTYPE html>\n` +
       `- ALL CSS and JS inline (no external files, no CDN links)\n` +
       `- Use these exact theme colors from the game: page background ${theme.primaryColor}, panel/card background ${theme.secondaryColor}, accent/highlight color ${theme.accentColor}, surface color ${theme.surfaceColor}, body text ${theme.textColor}\n` +
       `- Atmosphere matches: ${style}\n` +
-      `- MUST call: window.parent.postMessage({type:"PUZZLE_SOLVED",puzzleId:"${spec.id}"},"*") exactly once when solved\n` +
-      `- Must be solvable without outside knowledge\n` +
+      `- MUST implement the exact puzzle logic, clues, and validation rules from the concept above\n` +
+      `- MUST call: window.parent.postMessage({type:"PUZZLE_SOLVED",puzzleId:"${concept.id}"},"*") exactly once when solved\n` +
+      `- Must be solvable without outside knowledge and without inventing extra hidden rules\n` +
       `- No localStorage, sessionStorage, or cookies\n` +
       `- No alert() or confirm()\n` +
       `- Show a clear visual success state when solved\n` +
@@ -642,18 +683,18 @@ export class LlmService {
       `- Keep the HTML under 200 lines total\n\n` +
       `Output ONLY the raw HTML. No JSON wrapper, no markdown fences, no explanation.`;
 
-    return this.callLlm(prompt).pipe(
+    return this.callPuzzle(prompt).pipe(
       map((raw) => this.stripHtmlFences(raw)),
       map(
         (html): PuzzleEvent => ({
-          id: spec.id,
-          type: spec.type,
-          title: spec.title,
-          description: spec.description,
+          id: concept.id,
+          type: concept.puzzleType,
+          title: concept.puzzleTitle,
+          description: concept.puzzleDescription,
           htmlComponent: html,
-          solutionCondition: spec.solutionCondition,
-          rewardedClueId: spec.rewardedClueId,
-          hints: spec.hints,
+          solutionCondition: concept.solution,
+          rewardedClueId: concept.rewardedClueId,
+          hints: concept.hints,
         }),
       ),
     );
@@ -704,7 +745,10 @@ export class LlmService {
       `}\n\n` +
       `if targetsEventId is set, it must be one of: ${eventIds}`;
 
-    return this.callLlm(prompt).pipe(map((raw) => this.parseJson<HintResult>(raw)));
+    return this.callAndParseJson<HintResult>(prompt, {
+      maxTokens: 2200,
+      temperature: 0.7,
+    });
   }
 
   // ---------------------------------------------------------------------------
@@ -777,7 +821,10 @@ export class LlmService {
       `- Do NOT make accent and text the same color\n` +
       `- The palette must evoke "${style}" — avoid defaulting to generic dark navy/gold unless it specifically fits`;
 
-    return this.callLlm(prompt).pipe(map((raw) => this.parseJson<VisualResult>(raw)));
+    return this.callAndParseJson<VisualResult>(prompt, {
+      maxTokens: 2200,
+      temperature: 0.75,
+    });
   }
 
   // ---------------------------------------------------------------------------
@@ -786,7 +833,7 @@ export class LlmService {
 
   private assemble(ctx: GenCtx): CasePackage {
     // Resolve puzzleLabel â†’ puzzleId for event graph
-    const labelToId = new Map(ctx.puzzleSpecs.map((s) => [s.label, s.id]));
+    const labelToId = new Map(ctx.puzzleConcepts.map((concept) => [concept.label, concept.id]));
 
     const eventGraph: InvestigationEvent[] = ctx.events.map((e) => ({
       id: e.id,
@@ -862,32 +909,69 @@ export class LlmService {
   }
 
   // ---------------------------------------------------------------------------
-  // HTTP wrapper â€” thin call to Gemma via Gemini API
+  // Worker transport wrappers
   // ---------------------------------------------------------------------------
 
-  private callLlm(prompt: string, attempt = 0): Observable<string> {
-    const headers = new HttpHeaders({
-      'Content-Type': 'application/json',
-      'x-goog-api-key': environment.geminiApiKey,
-    });
-
-    const body = {
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      generationConfig: {
-        temperature: 0.85,
-        maxOutputTokens: 8192,
-      },
-    };
-
-    type GeminiResponse = { candidates: { content: { parts: { text: string }[] } }[] };
-
-    return this.http.post<GeminiResponse>(environment.llmApiEndpoint, body, { headers }).pipe(
-      map((resp) => resp.candidates[0].content.parts[0].text.trim()),
+  private callText(prompt: string, options: LlmCallOptions = {}, attempt = 0): Observable<string> {
+    return this.workerLlm.generateText({ prompt, ...options }).pipe(
       catchError((err: Error) => {
-        if (attempt < 2) return this.callLlm(prompt, attempt + 1);
-        return throwError(() => new Error(`LLM call failed: ${err.message}`));
+        if (attempt < 2) return this.callText(prompt, options, attempt + 1);
+        return throwError(
+          () => new Error(`LLM text call failed after ${attempt + 1} attempts: ${err.message}`),
+        );
       }),
     );
+  }
+
+  private callPuzzle(
+    prompt: string,
+    options: LlmCallOptions = {},
+    attempt = 0,
+  ): Observable<string> {
+    return this.workerLlm.generatePuzzle({ prompt, ...options }).pipe(
+      catchError((err: Error) => {
+        if (attempt < 2) return this.callPuzzle(prompt, options, attempt + 1);
+        return throwError(
+          () => new Error(`LLM puzzle call failed after ${attempt + 1} attempts: ${err.message}`),
+        );
+      }),
+    );
+  }
+
+  /** Calls the text model and parses JSON, retrying up to 2 times on invalid-JSON responses. */
+  private callAndParseJson<T>(
+    prompt: string,
+    options: LlmCallOptions = {},
+    jsonAttempt = 0,
+  ): Observable<T> {
+    return this.callText(prompt, options).pipe(
+      map((raw) => this.parseJson<T>(raw)),
+      catchError((err: Error) => {
+        if (err.message.startsWith('LLM response is not valid JSON') && jsonAttempt < 2) {
+          return this.callAndParseJson<T>(prompt, options, jsonAttempt + 1);
+        }
+        return throwError(() => err);
+      }),
+    );
+  }
+
+  /** Rewrites an image prompt into a safer form before it is sent to the image worker. */
+  createSafeImagePrompt(originalPrompt: string): Observable<string> {
+    const prompt =
+      `Rewrite this image-generation prompt into a safer production prompt before it is sent to the image worker.\n` +
+      `ORIGINAL PROMPT: "${originalPrompt}"\n\n` +
+      `Preserve the same scene, composition, atmosphere, visual style, and subject intent while making it less likely to trigger content filters.\n` +
+      `- Replace specific character names with generic descriptors (e.g. "a middle-aged man" not "Victor LeBlanc")\n` +
+      `- Replace identifiable person names, branded references, and overly specific personal details with neutral descriptive terms\n` +
+      `- Avoid wording that implies real-world violence, harm, or explicit content\n` +
+      `- Prefer detective-fiction phrasing like "tense scene", "mysterious evidence", or "dramatic portrait" over explicit criminal acts\n` +
+      `- Keep the same art style prefix, mood, atmosphere, and compositional intent intact\n` +
+      `- Keep the prompt concise and image-model friendly\n` +
+      `- Output ONLY the rewritten prompt text — no explanation, no quotes, no extra text`;
+    return this.callText(prompt, {
+      maxTokens: 500,
+      temperature: 0.1,
+    });
   }
 
   // ---------------------------------------------------------------------------

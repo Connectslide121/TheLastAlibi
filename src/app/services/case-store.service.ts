@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { Observable, from, of } from 'rxjs';
 import { catchError, map } from 'rxjs/operators';
 import { CasePackage } from '../models';
+import { deleteCaseImages } from '../utils/image-cache';
 
 export interface SavedCaseSummary {
   id: string;
@@ -54,9 +55,9 @@ export class CaseStoreService {
 
   deleteCase(sessionId: string): Observable<void> {
     return from(
-      this.dbPromise.then((db) =>
-        this.runTransaction(db, 'readwrite', (store) => store.delete(sessionId)),
-      ),
+      this.dbPromise
+        .then((db) => this.runTransaction(db, 'readwrite', (store) => store.delete(sessionId)))
+        .then(() => deleteCaseImages(sessionId)),
     ).pipe(
       map(() => void 0),
       catchError(() => of(void 0)),

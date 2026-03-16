@@ -10,7 +10,9 @@ import { Clue } from '../../models';
       style="border-color: rgba(201,168,76,0.3);"
     >
       <div
-        class="w-full aspect-square overflow-hidden bg-(--color-secondary) flex items-center justify-center"
+        class="w-full overflow-hidden bg-(--color-secondary) flex items-center justify-center"
+        [class.aspect-square]="variant() === 'full' || variant() === 'preview'"
+        [class.aspect-[4/3]]="variant() === 'compact'"
       >
         @if (clue().imageUrl) {
           <img [src]="clue().imageUrl" [alt]="clue().name" class="w-full h-full object-cover" />
@@ -28,30 +30,34 @@ import { Clue } from '../../models';
         </span>
       }
 
-      <div class="p-3 flex flex-col gap-1">
-        <h3
-          class="text-(--color-accent) font-serif font-bold text-sm leading-tight flex items-center gap-1.5"
-        >
-          <span class="material-icons mi-sm opacity-70">search</span>
-          {{ clue().name }}
-        </h3>
-        <p class="text-(--color-text) text-xs opacity-70 mt-1 line-clamp-2">
-          {{ clue().description }}
-        </p>
-        @if (showTruth()) {
-          <p
-            class="text-(--color-text) text-xs italic opacity-60 border-t pt-2 flex gap-1.5 items-start mt-1"
-            style="border-color: rgba(201,168,76,0.2);"
+      @if (variant() !== 'preview') {
+        <div class="p-3 flex flex-col gap-1">
+          <h3
+            class="text-(--color-accent) font-serif font-bold text-sm leading-tight flex items-center gap-1.5"
           >
-            <span class="material-icons mi-sm shrink-0 mt-0.5">lightbulb</span>
-            {{ clue().revealsInfo }}
+            <span class="material-icons mi-sm opacity-70">search</span>
+            {{ clue().name }}
+          </h3>
+          <p class="text-(--color-text) text-xs opacity-70 mt-1 line-clamp-2">
+            {{ clue().description }}
           </p>
-        }
-      </div>
+          @if (showTruth()) {
+            <p
+              class="text-(--color-text) text-xs italic opacity-60 border-t pt-2 flex gap-1.5 items-start mt-1"
+              [class.line-clamp-2]="variant() === 'compact'"
+              style="border-color: rgba(201,168,76,0.2);"
+            >
+              <span class="material-icons mi-sm shrink-0 mt-0.5">lightbulb</span>
+              {{ clue().revealsInfo }}
+            </p>
+          }
+        </div>
+      }
     </div>
   `,
 })
 export class ClueCardComponent {
   readonly clue = input.required<Clue>();
   readonly showTruth = input(false);
+  readonly variant = input<'full' | 'compact' | 'preview'>('full');
 }

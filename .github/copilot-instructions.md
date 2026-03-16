@@ -1,272 +1,139 @@
-# The Last Alibi — Copilot Instructions
+# The Last Alibi - Copilot Instructions
 
-> Read this file **before** writing any code in this repo. It defines every convention in use.
-
----
-
-## Project Overview
-
-**The Last Alibi** is an Angular 21 single-page application: an AI-powered detective mystery game where Gemini generates a unique case package (suspects, clues, puzzles, timeline, theme) and the player investigates and accuses a culprit.
+Read this file before making code changes. Keep it aligned with the repo as it exists now, not with an older plan or an imagined target architecture.
 
 ---
 
-## Implementation Plan
+## Start Here
 
-`IMPLEMENTATION_PLAN.md` in the repo root is the **single source of truth** for feature progress.
-
-- **Always update it** when completing work: change `- [ ]` to `- [x]` for every finished item.
-- Update the footer line (`*Last updated: Phase N — Complete ✓ (Phase N+1 next)*`) after each phase.
-- Use this PowerShell pattern to bulk-check a phase (replace `## Phase N` / `## Phase N+1`):
-  ```powershell
-  $c = Get-Content IMPLEMENTATION_PLAN.md -Raw
-  $s = $c.IndexOf('## Phase N')
-  $e = $c.IndexOf('## Phase N+1')
-  $block = $c.Substring($s, $e - $s) -replace '- \[ \]', '- [x]'
-  Set-Content IMPLEMENTATION_PLAN.md ($c.Substring(0, $s) + $block + $c.Substring($e)) -NoNewline
-  ```
-- Never skip checking the current plan state before starting new work.
+- Check `IMPLEMENTATION_PLAN.md` at the start of every work session.
+- Only mark checklist items complete if your work actually finished them.
+- If you touch the case-generation pipeline, read `MULTI_STEP_GENERATION_ARCHITECTURE.md` first.
+- Treat `README.md` as mostly Angular CLI boilerplate unless you have updated it yourself.
 
 ---
 
-## Angular Conventions
+## Project Snapshot
 
-### Version & Module System
-
-- **Angular 21.2**, strict TypeScript (`strict: true` in `tsconfig.json`).
-- **Standalone components only** — never use NgModules. Every component has `standalone: true`.
-- All providers live in `src/app/app.config.ts` via `provideX()` functions.
-
-### Component Pattern
-
-```ts
-import { Component, input, output, signal, computed, inject } from '@angular/core';
-
-@Component({
-  selector: 'app-my-component',
-  standalone: true,
-  imports: [
-    /* only what this component uses */
-  ],
-  template: `...`, // inline templates preferred for components < ~80 lines of HTML
-})
-export class MyComponent {
-  // Inputs use the new signal-based API
-  readonly myInput = input.required<string>();
-  readonly optionalInput = input(false); // default value in parens
-
-  // Outputs use output()
-  readonly myEvent = output<string>();
-
-  // Internal state
-  private readonly count = signal(0);
-  readonly doubled = computed(() => this.count() * 2);
-
-  // Injection
-  private readonly myService = inject(MyService);
-}
-```
-
-- Use `input()` / `input.required()` — **never** `@Input()`.
-- Use `output()` — **never** `@EventEmitter` / `@Output()`.
-- Use `signal()` / `computed()` for local state — **never** `BehaviorSubject` inside components.
-- Use `inject()` — **never** constructor injection.
-
-### Services
-
-- All services are `providedIn: 'root'` (tree-shakeable singletons).
-- Use `inject()` — never constructor injection.
-- Async operations return `Observable` (not `Promise`) unless the caller is a one-shot browser API.
-- Use `signal()` for reactive service state exposed to templates.
-
-### Control Flow
-
-Use Angular 17+ block syntax — **never** `*ngIf` / `*ngFor` / `*ngSwitch`:
-
-```html
-@if (condition) { ... } @for (item of list(); track item.id) { ... } @switch (val()) { @case ('a') {
-... } }
-```
-
-### Routing
-
-- All view routes lazy-load via `loadComponent` in `src/app/app.routes.ts`.
-- Route paths: `''`, `'generate'`, `'investigation'`, `'evidence-board'`, `'accusation'`, `'reveal'`.
-- `**` redirects to `''`.
+- Angular 21 standalone SPA, strict TypeScript, npm workspace.
+- Main scripts:
+  - `npm start` -> `ng serve --open`
+  - `npm run build` -> `ng build`
+  - `npm test` -> `ng test`
+- Unit tests use Vitest types (`vitest/globals`), not Jasmine or Jest idioms.
+- App routes are defined in `src/app/app.routes.ts` and lazy-load these views:
+  - `''`
+  - `'generate'`
+  - `'investigation'`
+  - `'evidence-board'`
+  - `'accusation'`
+  - `'reveal'`
+- Global providers live in `src/app/app.config.ts`.
+- The root shell is `src/app/app.ts` plus `app.html` and `app.css`.
 
 ---
 
-## Folder Structure
+## Angular Rules
 
-```
-src/app/
-  app.config.ts          — providers (HttpClient, Router, Animations)
-  app.routes.ts          — all lazy routes
-  app.ts / app.html      — root shell (RouterOutlet + ToastComponent)
-  models/                — TypeScript interfaces only, no logic
-    index.ts             — barrel re-export for all models
-  services/              — injectable services
-  components/            — reusable shared components
-    index.ts             — barrel re-export for all components
-  views/                 — full-page routed views (one folder per route)
-  utils/                 — pure functions, no Angular dependencies
-src/environments/
-  environment.ts         — production (empty API key)
-  environment.development.ts  — dev (real key, gitignored)
-```
+- Standalone components only. Do not introduce NgModules.
+- Prefer `input()`, `input.required()`, and `output()` over decorator-based inputs and outputs.
+- Prefer `signal()` and `computed()` for local UI state.
+- Prefer `inject()` over constructor injection in new or substantially refactored code.
+- Keep service APIs asynchronous with `Observable` unless you are wrapping a one-shot browser API.
+- Use Angular block syntax: `@if`, `@for`, `@switch`. Do not introduce `*ngIf`, `*ngFor`, or `*ngSwitch`.
+- Prefer `host` metadata over `@HostBinding` and `@HostListener` in new code. Some existing files still use the older pattern; do not copy that forward unless you are only making a minimal local edit.
+- Prefer inline templates for small components. The root shell may continue using external template/style files.
+- Import only what the component actually uses.
+- When creating or heavily refactoring components, prefer `ChangeDetectionStrategy.OnPush`. Do not churn neighboring files solely to add it.
+- Prefer reactive forms over template-driven forms.
+- Prefer class and style bindings over `ngClass` and `ngStyle`.
 
 ---
 
-## Tailwind CSS v4 Conventions
+## Styling Rules
 
-This project uses **Tailwind CSS v4** with `@tailwindcss/postcss`.
-
-### CSS Variable Shorthand (CRITICAL)
-
-Tailwind v4 uses `(--token)` syntax — **never** the v3 `[var(--token)]` form:
-
-| ❌ Old (v3, will warn)          | ✅ Correct (v4)            |
-| ------------------------------- | -------------------------- |
-| `bg-[var(--color-surface)]`     | `bg-(--color-surface)`     |
-| `text-[var(--color-accent)]`    | `text-(--color-accent)`    |
-| `border-[var(--color-primary)]` | `border-(--color-primary)` |
-
-### Arbitrary Value Shortcuts
-
-Prefer canonical Tailwind scale values over arbitrary brackets when equivalent:
-
-| ❌ Avoid        | ✅ Prefer    |
-| --------------- | ------------ |
-| `min-h-[4rem]`  | `min-h-16`   |
-| `min-h-[400px]` | `min-h-100`  |
-| `pl-[3.75rem]`  | `pl-15`      |
-| `-left-[9px]`   | `-left-2.25` |
-| `z-[200]`       | `z-200`      |
-| `flex-shrink-0` | `shrink-0`   |
-
-### Inline Styles for Dynamic Values
-
-Use `style="..."` or `[style.property]="..."` for values that come from runtime data (e.g. theme colors), **not** Tailwind classes:
-
-```html
-<!-- Dynamic — use inline style -->
-<div [style.border-color]="'var(--color-accent)'">
-  <!-- Static token — use Tailwind canonical class -->
-  <div class="border-(--color-accent)"></div>
-</div>
-```
-
-### Entry Point
-
-`src/styles.css` starts with `@import 'tailwindcss'`. Do not add a `tailwind.config.*` file — v4 is config-free.
+- Tailwind CSS v4 is enabled through `@import 'tailwindcss'` in `src/styles.css`.
+- Do not add a `tailwind.config.*` file unless the project explicitly changes direction.
+- Use Tailwind v4 CSS variable shorthand:
+  - `bg-(--color-surface)`
+  - `text-(--color-accent)`
+  - `border-(--color-primary)`
+- Do not use the older `[var(--token)]` syntax.
+- Prefer Tailwind scale utilities over arbitrary values when an equivalent exists.
+- Use inline style bindings for runtime theme values instead of trying to synthesize Tailwind classes from dynamic data.
+- Preserve the existing detective/noir visual language unless the user explicitly asks for a different direction.
+- Theme variables are defined in `src/styles.css` and applied at runtime through `ThemeService`.
+- Body textures are controlled with `data-texture` on `<body>`. Keep that contract intact.
 
 ---
 
-## CSS Custom Properties (Theme System)
+## Project Structure
 
-Defined in `:root` in `src/styles.css`. `ThemeService` overrides them at runtime per case.
+`src/app/models`
 
-| Variable             | Default                          | Purpose                            |
-| -------------------- | -------------------------------- | ---------------------------------- |
-| `--color-primary`    | `#1a1a2e`                        | Page background                    |
-| `--color-secondary`  | `#16213e`                        | Panel / card background            |
-| `--color-accent`     | `#c9a84c`                        | Gold highlights, headings, borders |
-| `--color-surface`    | `#0f0f23`                        | Elevated surfaces                  |
-| `--color-text`       | `#e8e0d0`                        | Body text                          |
-| `--color-text-muted` | `#9e9e8e`                        | Secondary / placeholder text       |
-| `--font-heading`     | Playfair Display / Georgia       | Headings                           |
-| `--font-body`        | Special Elite / Courier New      | Body copy                          |
-| `--font-mono`        | Courier Prime                    | Monospace / UI labels              |
-| `--border-style`     | `1px solid rgba(201,168,76,0.3)` | Default border                     |
-| `--shadow-style`     | `0 4px 24px rgba(0,0,0,0.6)`     | Default shadow                     |
+- Interfaces and types only. No Angular decorators or runtime logic.
+- Import from the barrel when practical.
 
-Texture overlays are activated by setting `data-texture="paper|grain|cork|metal|leather|fabric|pixel_noise"` on `<body>` via `ThemeService.applyTexture()`.
+`src/app/components`
 
----
+- Shared reusable UI pieces. Re-exported from `src/app/components/index.ts`.
 
-## Data Models
+`src/app/views`
 
-All models live in `src/app/models/` as pure TypeScript interfaces (no classes, no decorators).
-Import from the barrel: `import { CasePackage, Suspect, Clue } from '../models'`.
+- Route-level screens, one folder per view.
 
-Key types:
+`src/app/services`
 
-- `CasePackage` — root object returned by Gemini; contains all sub-models
-- `GameState` — runtime player progress, persisted to `localStorage`
-- `UITheme` — colors + texture family applied by `ThemeService`
-- `InvestigationEvent` — nodes in the event graph with `unlockConditions`
-- `UnlockCondition` — `type: 'event_completed' | 'clue_found' | 'act_reached'`
+- App services for LLM generation, image generation, themeing, persistence, and game state.
 
-**`Location` name conflict**: Angular's `@angular/common` exports a `Location` service. Always import the game model aliased:
+`src/app/utils`
 
-```ts
-import { Location as GameLocation } from '../../models';
-```
+- Pure helpers without Angular dependencies.
+
+`src/environments`
+
+- `environment.development.ts` is the local development file and is gitignored.
+- `environment.ts` is the committed default environment file.
 
 ---
 
-## API & Environment
+## Data and Persistence
 
-- **LLM**: Gemma 3 27B via `generativelanguage.googleapis.com` — `generateContent` endpoint.
-- **Images**: Imagen 4 Fast via `generativelanguage.googleapis.com` — `predict` endpoint.
-- **Single key**: Both use `environment.geminiApiKey` sent as `x-goog-api-key` header.
-- **Never** hardcode keys. Never commit `environment.development.ts` (it's gitignored).
-- Paste your key in `src/environments/environment.development.ts` locally only.
-
-### Gemini Request Shapes
-
-LLM (`LlmService`):
-
-```ts
-{
-  systemInstruction: { parts: [{ text: '...' }] },
-  contents: [{ role: 'user', parts: [{ text: prompt }] }],
-  generationConfig: { temperature: 0.9, maxOutputTokens: 8192, responseMimeType: 'application/json' }
-}
-// Response: candidates[0].content.parts[0].text
-```
-
-Image (`ImageService`):
-
-```ts
-{ instances: [{ prompt }], parameters: { sampleCount: 1 } }
-// Response: predictions[0].bytesBase64Encoded + predictions[0].mimeType
-```
+- Check the live interfaces before changing model consumers. The docs in this file are guidance, not an exhaustive schema reference.
+- `CasePackage` includes generated content plus optional generated image URLs.
+- `GameState` includes investigation progress plus persisted evidence-board layout and contradiction tracking.
+- `GameStateService` stores runtime progress in `localStorage`.
+- `CaseStoreService` stores full generated cases in IndexedDB.
+- `ImageService` uses IndexedDB-backed image caching via `src/app/utils/image-cache.ts` and returns object URLs or placeholders.
+- If you import the game `Location` model in a file that also touches Angular's `Location` service, alias the model as `GameLocation`.
 
 ---
 
-## Services Summary
+## Generation Pipeline Rules
 
-| Service            | File                                | Key API                                                                                            |
-| ------------------ | ----------------------------------- | -------------------------------------------------------------------------------------------------- |
-| `LlmService`       | `services/llm.service.ts`           | `generateCasePackage(difficulty, style): Observable<CasePackage>`                                  |
-| `ImageService`     | `services/image.service.ts`         | `generateImage(prompt): Observable<string>`, `generateAllCaseImages(pkg): Observable<CasePackage>` |
-| `GameStateService` | `services/game-state.service.ts`    | Signal-based state, `localStorage` persistence, all player actions                                 |
-| `CaseStoreService` | `services/case-store.service.ts`    | IndexedDB persistence for full `CasePackage`                                                       |
-| `ThemeService`     | `services/theme.service.ts`         | `applyTheme(UITheme)`, `applyTexture(family)`, `resetTheme()`                                      |
-| `ToastService`     | `components/toast/toast.service.ts` | `show(message, type)` — auto-dismisses after 3 s                                                   |
+- `LlmService` is a staged generation pipeline, not a single monolithic prompt.
+- Preserve step ordering, validation boundaries, and cross-reference safety between generated entities.
+- If you change prompts, keep outputs machine-parseable and schema-aware.
+- If you change puzzle generation, keep the HTML self-contained and compatible with the sandboxed iframe renderer.
+- If you change image generation, preserve caching behavior and progressive image emission so gameplay can continue while images arrive.
 
 ---
 
-## Shared Components Summary
+## Security and Secrets
 
-All importable from `src/app/components/index.ts`.
-
-| Component                | Selector               | Key inputs / outputs                                           |
-| ------------------------ | ---------------------- | -------------------------------------------------------------- |
-| `LoadingScreenComponent` | `<app-loading-screen>` | `message` input (optional; auto-rotates flavor text if absent) |
-| `ClueCardComponent`      | `<app-clue-card>`      | `clue` (required), `showTruth`                                 |
-| `SuspectCardComponent`   | `<app-suspect-card>`   | `suspect` (required), `isInterviewed`; emits `cardClicked`     |
-| `LocationCardComponent`  | `<app-location-card>`  | `location` (required), `isVisited`; emits `cardClicked`        |
-| `TimelineComponent`      | `<app-timeline>`       | `events` (required), `revealTruth`                             |
-| `DialogueBoxComponent`   | `<app-dialogue-box>`   | `lines` (required); emits `dialogueClosed`                     |
-| `PuzzleFrameComponent`   | `<app-puzzle-frame>`   | `puzzle` (required); emits `puzzleSolved` (clue ID)            |
-| `ToastComponent`         | `<app-toast>`          | No inputs — reads from `ToastService`. Already in `app.html`.  |
-| `ActBannerComponent`     | `<app-act-banner>`     | `act`, `title`, `summary` (all required); emits `dismissed`    |
-
----
-
-## Security Notes
-
-- `PuzzleFrameComponent` uses `DomSanitizer.bypassSecurityTrustHtml` for the puzzle iframe `srcdoc`. This is safe because the iframe has `sandbox="allow-scripts"` with **no** `allow-same-origin` — the puzzle HTML cannot access parent DOM, cookies, or storage.
 - Never add `allow-same-origin` to the puzzle iframe sandbox.
-- Never commit API keys. The `x-goog-api-key` header is set only in `LlmService` and `ImageService`, which read from `environment`.
+- `PuzzleFrameComponent` relies on `DomSanitizer.bypassSecurityTrustHtml` only because the iframe remains sandboxed with `allow-scripts` only.
+- Do not hardcode, duplicate, or log API keys.
+- Do not copy secrets into docs, prompts, tests, or comments.
+- Read API endpoints and keys from `src/environments/environment*.ts`.
+- Image generation currently goes through `imageWorkerEndpoint`; do not silently replace that transport without checking the surrounding architecture.
+
+---
+
+## Editing Guidance
+
+- Prefer minimal, focused changes over large cleanups.
+- Match the surrounding file style unless you are doing an intentional refactor.
+- Do not treat every existing pattern as ideal. Some files contain older Angular patterns kept for local stability.
+- If you touch user-facing game flow, check whether the implementation plan or architecture doc also needs updating.
+- When adding tests, use the existing Angular + Vitest setup and avoid introducing a second test style.

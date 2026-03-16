@@ -234,6 +234,7 @@ export class HomeView implements OnInit {
     const c = this.pendingDelete();
     if (!c) return;
     this.pendingDelete.set(null);
+    this.gsvc.deleteState(c.id);
     this.caseStore.deleteCase(c.id).subscribe(() => this.loadSavedCases());
   }
 
