@@ -338,6 +338,10 @@ export function buildPuzzleConceptPrompt(
     `Available evidence and clue context:\n${clueCatalog}\n\n` +
     `Your goal in this step is to ensure this puzzle has real logic, embedded clues, and a clearly intended solution before any HTML is written.\n` +
     `The player must be able to solve it from the text clues and instructions alone; the HTML is only supplemental presentation.\n` +
+    `The answer must be DERIVABLE, not guessed. Every part of the solution must come from player-visible information.\n` +
+    `If the answer is numeric, explain exactly where each digit or number chunk comes from. If the answer is textual, explain exactly how the letters/word are obtained.\n` +
+    `Do NOT invent hidden transformations, arbitrary cipher shifts, unstated math, or brute-force-only solutions.\n` +
+    `Do NOT use a Caesar cipher, substitution rule, or other encoding scheme unless the visible clues explicitly provide the ciphertext and the information needed to decode it.\n` +
     `Output ONLY raw JSON. No markdown fences.\n\n` +
     `{\n` +
     `  "label": "${label}",\n` +
@@ -347,6 +351,7 @@ export function buildPuzzleConceptPrompt(
     `  "puzzleType": "cipher",\n` +
     `  "puzzleDescription": "what the player sees when the puzzle opens, 1-2 sentences",\n` +
     `  "puzzleLogic": "the internal reasoning structure and how the clues lead to the answer",\n` +
+    `  "derivationSteps": ["step 1 showing how the first clue is used", "step 2 showing how that produces the answer or part of it"],\n` +
     `  "interactionInstructions": "clear player-facing instructions for how to use the clues and what to submit",\n` +
     `  "clues": ["explicit clue the player can inspect", "second clue that supports the logic", "optional third clue"],\n` +
     `  "answerPrompt": "short label above the answer field",\n` +
@@ -365,6 +370,10 @@ export function buildPuzzleConceptPrompt(
     `- rewardedClueId must be exactly ${rewardedClueId}\n` +
     `- clues must contain 2-5 concrete puzzle clues the player can reason from without outside knowledge\n` +
     `- puzzleLogic must describe how the puzzle actually works, not just its theme\n` +
+    `- derivationSteps must contain 2-6 explicit steps that show exactly how the answer is derived from the visible clues\n` +
+    `- No derivation step may rely on hidden information, external knowledge, or "notice a pattern" without stating the actual pattern\n` +
+    `- If the answer is a number, the derivationSteps must explain exactly how each digit or digit group is obtained\n` +
+    `- If you mention a cipher, code, shift, mapping, subtraction, addition, ordering rule, or extraction rule, the clues must explicitly contain enough information for the player to perform it\n` +
     `- interactionInstructions must make the required player action unambiguous\n` +
     `- answerPrompt and answerPlaceholder must help the player understand what to type\n` +
     `- answerFormat must describe the exact expected syntax\n` +
@@ -390,6 +399,7 @@ export function buildPuzzleHtmlPrompt(
     `Type: ${concept.puzzleType}\n` +
     `What the player sees: ${concept.puzzleDescription}\n` +
     `Puzzle logic: ${concept.puzzleLogic}\n` +
+    `Exact derivation steps: ${concept.derivationSteps.join(' | ')}\n` +
     `Player instructions: ${concept.interactionInstructions}\n` +
     `Embedded clues: ${concept.clues.join(' | ')}\n` +
     `Answer prompt: ${concept.answerPrompt}\n` +
@@ -409,6 +419,7 @@ export function buildPuzzleHtmlPrompt(
     `- The host application already shows the clues, instructions, hints, and answer submission UI; this HTML is supplemental presentation only\n` +
     `- MUST visually reinforce the same puzzle logic and clues from the concept above\n` +
     `- MUST NOT introduce any new rules, hidden clues, or required knowledge that are absent from the concept\n` +
+    `- The player must be able to infer the answer from the visible content above without brute force; the HTML should make the derivation easier to see, not more obscure\n` +
     `- You MAY include internal interactive controls, but they are optional because the host owns answer submission\n` +
     `- If the HTML includes an internal solved state, it MUST call: window.parent.postMessage({type:"PUZZLE_SOLVED",puzzleId:"${concept.id}"},"*") exactly once when solved\n` +
     `- Must be solvable without outside knowledge and without inventing extra hidden rules\n` +

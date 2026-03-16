@@ -28,6 +28,12 @@ import {
 } from '../../models';
 
 type UnlockSpotlight = { kind: 'clue'; clue: Clue } | { kind: 'suspect'; suspect: Suspect };
+type CaseFileImageLightbox = {
+  url: string;
+  alt: string;
+  title: string;
+  caption: string;
+};
 
 @Component({
   selector: 'app-investigation-view',
@@ -618,49 +624,88 @@ type UnlockSpotlight = { kind: 'clue'; clue: Clue } | { kind: 'suspect'; suspect
           <div class="flex-1 overflow-y-auto p-5 flex flex-col gap-5">
             <!-- BRIEFING TAB -->
             @if (caseFileTab() === 'briefing') {
-              <div class="flex flex-col gap-5">
-                <!-- Hero / briefing image -->
-                @if (casePackage()?.briefingImageUrl) {
-                  <div
-                    class="w-full max-w-3xl mx-auto rounded-lg overflow-hidden"
-                    style="aspect-ratio: 16/9"
-                  >
-                    <img
-                      [src]="casePackage()!.briefingImageUrl"
-                      [alt]="casePackage()?.metadata?.title"
-                      class="w-full h-full object-cover"
-                    />
+              <div class="flex flex-col gap-4">
+                <!-- ── Case header: title + small inline thumbnail ── -->
+                <section
+                  class="rounded-lg p-4 flex gap-4 items-start"
+                  style="background: var(--color-surface); border: var(--border-style)"
+                >
+                  <div class="flex flex-col gap-2 flex-1 min-w-0">
+                    <span
+                      class="font-mono text-[0.68rem] uppercase tracking-[0.26em]"
+                      style="color: var(--color-text-muted)"
+                      >{{ casePackage()?.metadata?.caseType }}</span
+                    >
+                    <h3
+                      class="font-heading text-xl leading-tight"
+                      style="color: var(--color-accent)"
+                    >
+                      {{ casePackage()?.metadata?.title }}
+                    </h3>
+                    @if (casePackage()?.metadata?.subtitle) {
+                      <p class="font-mono text-xs" style="color: var(--color-text-muted)">
+                        {{ casePackage()?.metadata?.subtitle }}
+                      </p>
+                    }
+                    <div class="flex flex-wrap gap-1.5 mt-1">
+                      <span
+                        class="rounded px-2 py-0.5 font-mono text-[0.65rem]"
+                        style="background: rgba(201,168,76,0.14); color: var(--color-accent)"
+                        >Act {{ gameState()?.currentAct ?? 1 }} / 3</span
+                      >
+                      <span
+                        class="rounded px-2 py-0.5 font-mono text-[0.65rem]"
+                        style="background: rgba(255,255,255,0.05); color: var(--color-text-muted)"
+                        >{{ casePackage()?.metadata?.setting }}</span
+                      >
+                      <span
+                        class="rounded px-2 py-0.5 font-mono text-[0.65rem]"
+                        style="background: rgba(255,255,255,0.05); color: var(--color-text-muted)"
+                        >{{ foundClues().length }} evidence</span
+                      >
+                      <span
+                        class="rounded px-2 py-0.5 font-mono text-[0.65rem]"
+                        style="background: rgba(255,255,255,0.05); color: var(--color-text-muted)"
+                        >{{ unlockedSuspects().length }} suspects ·
+                        {{ revealedLocationCount() }} locations</span
+                      >
+                      <span
+                        class="rounded px-2 py-0.5 font-mono text-[0.65rem]"
+                        style="background: rgba(255,255,255,0.05); color: var(--color-text-muted)"
+                        >{{ hintsRemaining() }} hints left</span
+                      >
+                    </div>
                   </div>
-                }
-                <div class="flex flex-col gap-1">
-                  <span
-                    class="font-mono text-xs uppercase tracking-widest"
-                    style="color: var(--color-text-muted)"
-                    >{{ casePackage()?.metadata?.caseType }}</span
-                  >
-                  <h3 class="font-heading text-2xl" style="color: var(--color-accent)">
-                    {{ casePackage()?.metadata?.title }}
-                  </h3>
-                  @if (casePackage()?.metadata?.subtitle) {
-                    <p class="font-mono text-sm" style="color: var(--color-text-muted)">
-                      {{ casePackage()?.metadata?.subtitle }}
-                    </p>
+                  @if (casePackage()?.briefingImageUrl) {
+                    <button
+                      type="button"
+                      (click)="
+                        openCaseFileImage(
+                          casePackage()!.briefingImageUrl!,
+                          casePackage()?.metadata?.title ?? 'Case image',
+                          casePackage()?.metadata?.setting ?? ''
+                        )
+                      "
+                      class="group shrink-0 rounded-md overflow-hidden cursor-pointer"
+                      style="width: 136px; height: 92px; background: rgba(255,255,255,0.04)"
+                      aria-label="Expand case image"
+                    >
+                      <img
+                        [src]="casePackage()!.briefingImageUrl"
+                        [alt]="casePackage()?.metadata?.title"
+                        class="w-full h-full object-cover transition-transform duration-200 group-hover:scale-[1.04]"
+                      />
+                    </button>
                   }
-                </div>
-                <div class="flex items-center gap-2">
-                  <span class="material-icons" style="font-size: 1rem; color: var(--color-accent)"
-                    >location_on</span
-                  >
-                  <span class="font-mono text-sm" style="color: var(--color-text-muted)">
-                    {{ casePackage()?.metadata?.setting }}
-                  </span>
-                </div>
-                <div
-                  class="rounded-lg p-4"
+                </section>
+
+                <!-- ── Briefing text ── -->
+                <section
+                  class="rounded-lg p-4 flex flex-col gap-2"
                   style="background: var(--color-surface); border: var(--border-style)"
                 >
                   <p
-                    class="font-mono text-xs uppercase tracking-widest mb-3 flex items-center gap-1.5"
+                    class="font-mono text-xs uppercase tracking-widest flex items-center gap-1.5"
                     style="color: var(--color-accent)"
                   >
                     <span class="material-icons" style="font-size: 0.9rem">description</span>
@@ -672,37 +717,62 @@ type UnlockSpotlight = { kind: 'clue'; clue: Clue } | { kind: 'suspect'; suspect
                   >
                     {{ casePackage()?.metadata?.briefing }}
                   </p>
-                </div>
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                </section>
+
+                <!-- ── Act previews: horizontal thumbnail + text ── -->
+                <div class="flex flex-col gap-3">
                   @for (act of briefingActPreviews(); track act.label) {
-                    <div
-                      class="rounded-lg overflow-hidden"
+                    <article
+                      class="rounded-lg overflow-hidden flex"
                       style="background: var(--color-surface); border: var(--border-style)"
                     >
                       @if (act.imageUrl) {
-                        <div class="w-full" style="aspect-ratio: 16/9">
+                        <button
+                          type="button"
+                          (click)="
+                            openCaseFileImage(
+                              act.imageUrl,
+                              act.label + ' – ' + (casePackage()?.metadata?.title ?? ''),
+                              act.summary
+                            )
+                          "
+                          class="group shrink-0 overflow-hidden cursor-pointer"
+                          style="width: 128px; min-height: 84px; background: rgba(255,255,255,0.04)"
+                          [attr.aria-label]="'Expand image for ' + act.label"
+                        >
                           <img
                             [src]="act.imageUrl"
                             [alt]="act.label"
-                            class="w-full h-full object-cover"
+                            class="w-full h-full object-cover transition-transform duration-200 group-hover:scale-[1.04]"
                           />
+                        </button>
+                      } @else {
+                        <div
+                          class="shrink-0 flex items-center justify-center opacity-20"
+                          style="width: 128px; min-height: 84px; background: rgba(255,255,255,0.04)"
+                        >
+                          <span
+                            class="material-icons"
+                            style="font-size: 2rem; color: var(--color-text)"
+                            >image_not_supported</span
+                          >
                         </div>
                       }
-                      <div class="p-4">
+                      <div class="flex-1 flex flex-col gap-1 p-3 min-w-0">
                         <p
-                          class="font-mono text-xs uppercase tracking-widest mb-1.5"
+                          class="font-mono text-xs uppercase tracking-widest"
                           style="color: var(--color-accent)"
                         >
                           {{ act.label }}
                         </p>
                         <p
                           class="text-sm leading-relaxed"
-                          style="font-family: var(--font-body); color: var(--color-text); opacity: 0.8"
+                          style="font-family: var(--font-body); color: var(--color-text); opacity: 0.88"
                         >
                           {{ act.summary }}
                         </p>
                       </div>
-                    </div>
+                    </article>
                   }
                 </div>
               </div>
@@ -1292,6 +1362,52 @@ type UnlockSpotlight = { kind: 'clue'; clue: Clue } | { kind: 'suspect'; suspect
         </div>
       }
 
+      @if (expandedCaseFileImage()) {
+        <div
+          class="fixed inset-0 z-80 flex items-center justify-center p-4"
+          style="background: rgba(0,0,0,0.88)"
+          (click)="expandedCaseFileImage.set(null)"
+        >
+          <div
+            class="relative w-full max-w-5xl max-h-[92vh] overflow-hidden rounded-lg flex flex-col"
+            style="background: var(--color-secondary); border: var(--border-style); animation: fadeIn 0.2s ease both"
+            (click)="$event.stopPropagation()"
+          >
+            <button
+              type="button"
+              (click)="expandedCaseFileImage.set(null)"
+              class="absolute top-3 right-3 z-10 p-1.5 rounded-full opacity-70 hover:opacity-100 cursor-pointer transition-opacity"
+              style="background: rgba(0,0,0,0.45)"
+              aria-label="Close expanded image"
+            >
+              <span class="material-icons mi-md" style="color: white">close</span>
+            </button>
+            <div
+              class="w-full flex items-center justify-center bg-black/35 max-h-[72vh] overflow-hidden"
+            >
+              <img
+                [src]="expandedCaseFileImage()!.url"
+                [alt]="expandedCaseFileImage()!.alt"
+                class="w-full h-full object-contain max-h-[72vh]"
+              />
+            </div>
+            <div class="p-4 md:p-5 flex flex-col gap-2" style="background: var(--color-secondary)">
+              <h3 class="font-heading text-2xl" style="color: var(--color-accent)">
+                {{ expandedCaseFileImage()!.title }}
+              </h3>
+              @if (expandedCaseFileImage()!.caption) {
+                <p
+                  class="text-sm leading-relaxed"
+                  style="font-family: var(--font-body); color: var(--color-text)"
+                >
+                  {{ expandedCaseFileImage()!.caption }}
+                </p>
+              }
+            </div>
+          </div>
+        </div>
+      }
+
       @if (debugDashboardOpen() && casePackage(); as pkg) {
         <app-debug-dashboard [casePackage]="pkg" (closeRequested)="debugDashboardOpen.set(false)" />
       }
@@ -1349,6 +1465,7 @@ export class InvestigationView implements OnInit {
   readonly expandedSuspect = signal<Suspect | null>(null);
   readonly expandedClue = signal<Clue | null>(null);
   readonly expandedLocation = signal<GameLocation | null>(null);
+  readonly expandedCaseFileImage = signal<CaseFileImageLightbox | null>(null);
   readonly replayingEventId = signal<string | null>(null);
   readonly unlockSpotlight = signal<UnlockSpotlight | null>(null);
   readonly debugDashboardOpen = signal(false);
@@ -1552,6 +1669,10 @@ export class InvestigationView implements OnInit {
     ].slice(0, currentAct);
   });
 
+  readonly revealedLocationCount = computed(() =>
+    this.locationsByAct().reduce((count, group) => count + group.locations.length, 0),
+  );
+
   readonly visibleTimelineEvents = computed(() => {
     const pkg = this.casePackage();
     const completedCount = this.gameState()?.completedEventIds.length ?? 0;
@@ -1731,6 +1852,16 @@ export class InvestigationView implements OnInit {
 
   onLocationClicked(location: GameLocation): void {
     this.expandedLocation.set(location);
+  }
+
+  openCaseFileImage(url: string, title: string, caption: string): void {
+    if (!url) return;
+    this.expandedCaseFileImage.set({
+      url,
+      alt: title,
+      title,
+      caption,
+    });
   }
 
   useHint(): void {

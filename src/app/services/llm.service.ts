@@ -16,6 +16,7 @@ import { DebugRequestMeta } from './debug-trace.service';
 import { WorkerLlmService } from './worker-llm';
 import { repairEventGraph } from '../utils/event-graph-repair';
 import { normalizeCasePackage } from '../utils/normalize-case-package';
+import { validatePuzzleConcept } from '../utils/puzzle-concept-validation';
 
 import {
   Difficulty,
@@ -298,19 +299,56 @@ export class LlmService {
     f: CaseFoundation,
     clues: CluesResult,
     event: EventSpec & { puzzleLabel: string },
+    attempt = 0,
+    previousFailures: string[] = [],
   ): Observable<PuzzleConcept> {
     const label = event.puzzleLabel;
     const puzzleId = `puzzle-${label}`;
-    return this.callAndParseJson<PuzzleConcept>(buildPuzzleConceptPrompt(f, clues, event), {
-      maxTokens: 1200,
-      temperature: 0.65,
-      debugMeta: {
-        label: `Puzzle Concept: ${label}`,
-        category: 'puzzle-concept',
-        puzzleId,
-        puzzleLabel: label,
+    const rewardedClueId = event.rewardsClueIds[0] ?? clues.importantClueId;
+    const retryGuidance =
+      previousFailures.length > 0
+        ? `\n\nYour previous attempt was rejected for these reasons:\n- ${previousFailures.join('\n- ')}\nReturn a corrected puzzle concept that fixes every issue explicitly.`
+        : '';
+
+    return this.callAndParseJson<PuzzleConcept>(
+      buildPuzzleConceptPrompt(f, clues, event) + retryGuidance,
+      {
+        maxTokens: 1500,
+        temperature: 0.65,
+        debugMeta: {
+          label: `Puzzle Concept: ${label}`,
+          category: 'puzzle-concept',
+          puzzleId,
+          puzzleLabel: label,
+        },
       },
-    }).pipe(map((concept) => ({ ...concept, label, id: puzzleId })));
+    ).pipe(
+      switchMap((concept) => {
+        const normalizedConcept: PuzzleConcept = {
+          ...concept,
+          label,
+          id: puzzleId,
+          rewardedClueId,
+          derivationSteps: concept.derivationSteps ?? [],
+        };
+        const validation = validatePuzzleConcept(normalizedConcept, clues.clues, rewardedClueId);
+
+        if (!validation.isValid && attempt < 2) {
+          return this.step7PuzzleConcept(f, clues, event, attempt + 1, validation.reasons);
+        }
+
+        if (!validation.isValid) {
+          return throwError(
+            () =>
+              new Error(
+                `Puzzle concept ${puzzleId} failed validation after ${attempt + 1} attempts: ${validation.reasons.join(' ')}`,
+              ),
+          );
+        }
+
+        return of(normalizedConcept);
+      }),
+    );
   }
 
   // ---------------------------------------------------------------------------

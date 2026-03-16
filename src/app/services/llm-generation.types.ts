@@ -79,6 +79,7 @@ export interface PuzzleConcept {
   puzzleType: PuzzleEvent['type'];
   puzzleDescription: string;
   puzzleLogic: string;
+  derivationSteps: string[];
   interactionInstructions: string;
   clues: string[];
   answerPrompt: string;
