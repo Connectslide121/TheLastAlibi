@@ -1,4 +1,71 @@
-import { CasePackage } from '../models';
+import { CasePackage, InvestigationEvent } from '../models';
+
+/**
+ * Ensures every suspect and every clue in the case is reachable through the
+ * event graph. Orphaned items are assigned to existing non-puzzle events,
+ * spread across acts so the player still experiences progression.
+ */
+function ensureCompleteCoverage(
+  eventGraph: InvestigationEvent[],
+  pkg: CasePackage,
+): InvestigationEvent[] {
+  const allSuspectIds = new Set(pkg.suspects.map((s) => s.id));
+  const allClueIds = new Set(pkg.clues.map((c) => c.id));
+
+  // Suspects reachable through unlocksSuspectIds or dialogueSuspectId
+  const coveredSuspects = new Set<string>();
+  for (const ev of eventGraph) {
+    (ev.unlocksSuspectIds ?? []).forEach((id) => coveredSuspects.add(id));
+    if (ev.dialogueSuspectId) coveredSuspects.add(ev.dialogueSuspectId);
+  }
+
+  // Clues reachable through rewardsClueIds
+  const coveredClues = new Set<string>();
+  for (const ev of eventGraph) {
+    (ev.rewardsClueIds ?? []).forEach((id) => coveredClues.add(id));
+  }
+
+  const orphanSuspects = [...allSuspectIds].filter((id) => !coveredSuspects.has(id));
+  const orphanClues = [...allClueIds].filter((id) => !coveredClues.has(id));
+
+  if (orphanSuspects.length === 0 && orphanClues.length === 0) return eventGraph;
+
+  // Clone events so we can mutate safely
+  const events = eventGraph.map((ev) => ({
+    ...ev,
+    unlocksSuspectIds: [...(ev.unlocksSuspectIds ?? [])],
+    rewardsClueIds: [...(ev.rewardsClueIds ?? [])],
+  }));
+
+  // Eligible targets: non-puzzle events, sorted by act ascending then by
+  // current payload size ascending (round-robin load-balance across acts).
+  const eligible = events
+    .filter((ev) => !ev.puzzleId)
+    .sort((a, b) => a.act - b.act || a.rewardsClueIds.length - b.rewardsClueIds.length);
+
+  // Fallback: if every event is a puzzle event (very unlikely), use all events.
+  const pool = eligible.length > 0 ? eligible : events;
+
+  // Assign orphaned suspects – spread across the pool round-robin
+  for (let i = 0; i < orphanSuspects.length; i++) {
+    const target = pool[i % pool.length];
+    target.unlocksSuspectIds.push(orphanSuspects[i]);
+    console.warn(
+      `[Coverage] Assigned orphan suspect "${orphanSuspects[i]}" → event "${target.id}" (act ${target.act})`,
+    );
+  }
+
+  // Assign orphaned clues – spread across the pool round-robin
+  for (let i = 0; i < orphanClues.length; i++) {
+    const target = pool[i % pool.length];
+    target.rewardsClueIds.push(orphanClues[i]);
+    console.warn(
+      `[Coverage] Assigned orphan clue "${orphanClues[i]}" → event "${target.id}" (act ${target.act})`,
+    );
+  }
+
+  return events;
+}
 
 export function normalizeCasePackage(casePackage: CasePackage): CasePackage {
   const validClueIds = new Set(casePackage.clues.map((clue) => clue.id));
@@ -67,9 +134,16 @@ export function normalizeCasePackage(casePackage: CasePackage): CasePackage {
     };
   });
 
-  return {
+  // Ensure every suspect and clue is reachable through the event graph
+  const coveredEventGraph = ensureCompleteCoverage(normalizedEventGraph, {
     ...casePackage,
     puzzles,
     eventGraph: normalizedEventGraph,
+  });
+
+  return {
+    ...casePackage,
+    puzzles,
+    eventGraph: coveredEventGraph,
   };
 }

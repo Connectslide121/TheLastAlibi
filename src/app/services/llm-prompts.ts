@@ -298,7 +298,12 @@ export function buildEventGraphPrompt(
     `- All dialogueSuspectId and unlocksSuspectIds values must be from the suspect IDs list\n` +
     `- unlockConditions referenceId must exist in the clue IDs, suspect IDs, or other event IDs in this array\n` +
     `- Do NOT create circular unlock conditions\n` +
-    `- Key culprit clues (${clues.culpritClueIds.join(', ')}) should be rewards in Act 2-3 events`
+    `- Key culprit clues (${clues.culpritClueIds.join(', ')}) should be rewards in Act 2-3 events\n` +
+    `\nCRITICAL COVERAGE REQUIREMENT — the player must be able to discover everything by the end of Act 3:\n` +
+    `- EVERY suspect ID (${suspectIds}) must appear in at least one event: either as a dialogueSuspectId OR inside an event's unlocksSuspectIds. No suspect may be permanently hidden.\n` +
+    `- EVERY clue ID (${clueIds}) must appear in at least one event's rewardsClueIds. No clue may be permanently undiscoverable.\n` +
+    `- Spread suspect and clue unlocks across all three acts for a sense of progression. Do not dump everything in Act 1.\n` +
+    `- By the end of Act 3, completing all events must guarantee the player has seen every suspect and found every clue.`
   );
 }
 
