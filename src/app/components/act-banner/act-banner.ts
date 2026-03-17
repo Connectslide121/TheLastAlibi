@@ -1,4 +1,5 @@
-import { Component, OnInit, input, output, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, inject, input, output, signal } from '@angular/core';
+import { TtsService } from '../../services/tts.service';
 
 @Component({
   selector: 'app-act-banner',
@@ -41,34 +42,52 @@ import { Component, OnInit, input, output, signal } from '@angular/core';
 
         <!-- Footer hint -->
         <div
-          class="px-8 pb-6 flex items-center justify-center gap-2 animate-pulse"
+          class="px-8 pb-6 flex items-center justify-center gap-2"
           style="color: var(--color-text-muted)"
           (click)="dismiss()"
         >
-          <span class="material-icons mi-sm">touch_app</span>
-          <span class="font-mono text-xs tracking-widest uppercase opacity-50"
-            >Click to continue</span
-          >
+          @if (tts.isPlaying()) {
+            <span class="material-icons mi-sm animate-pulse">volume_up</span>
+          } @else {
+            <span class="material-icons mi-sm animate-pulse">touch_app</span>
+          }
+          <span class="font-mono text-xs tracking-widest uppercase opacity-50">
+            {{ tts.isPlaying() ? 'Listening…' : 'Click to continue' }}
+          </span>
         </div>
       </div>
     </div>
   `,
 })
-export class ActBannerComponent implements OnInit {
+export class ActBannerComponent implements OnInit, OnDestroy {
   readonly act = input.required<1 | 2 | 3>();
   readonly title = input.required<string>();
   readonly summary = input.required<string>();
   readonly imageUrl = input('');
+  readonly caseId = input('');
   readonly dismissed = output<void>();
 
   readonly visible = signal(false);
+  readonly tts = inject(TtsService);
 
   ngOnInit(): void {
-    // Small delay so the opacity transition plays on entry
-    setTimeout(() => this.visible.set(true), 50);
+    setTimeout(() => {
+      this.visible.set(true);
+      // Brief pause lets the fade-in settle before audio starts
+      setTimeout(() => {
+        const text = `${this.title()}. ${this.summary()}`;
+        const key = `act${this.act()}`;
+        this.tts.playNarration(this.caseId(), key, text, 'zeus').subscribe();
+      }, 600);
+    }, 50);
+  }
+
+  ngOnDestroy(): void {
+    this.tts.stop();
   }
 
   dismiss(): void {
+    this.tts.stop();
     this.visible.set(false);
     setTimeout(() => this.dismissed.emit(), 500);
   }

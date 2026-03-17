@@ -6,6 +6,7 @@ import { GameStateService } from '../../services/game-state.service';
 import { ThemeService } from '../../services/theme.service';
 import { ImageService } from '../../services/image.service';
 import { InterviewService, InterviewChatMessage } from '../../services/interview.service';
+import { TtsService } from '../../services/tts.service';
 import { repairEventGraph } from '../../utils/event-graph-repair';
 import {
   SuspectCardComponent,
@@ -109,7 +110,7 @@ type CaseFileImageLightbox = {
         </span>
         <button
           type="button"
-          (click)="caseFileOpen.set(true)"
+          (click)="openCaseFile()"
           class="px-3 py-1.5 text-xs font-mono uppercase tracking-widest rounded cursor-pointer border border-(--color-accent) text-(--color-accent) hover:opacity-80 transition-opacity flex items-center gap-1"
         >
           <span class="material-icons mi-sm">folder_open</span>
@@ -570,6 +571,67 @@ type CaseFileImageLightbox = {
         </div>
       }
 
+      <!-- Briefing Overlay — shown on fresh case start -->
+      @if (showBriefingOverlay()) {
+        <div
+          class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto transition-opacity duration-500"
+          style="background: rgba(0,0,0,0.92)"
+          (click)="dismissBriefingOverlay()"
+        >
+          <div
+            class="relative w-full max-w-lg mx-4 my-8 rounded-lg overflow-hidden flex flex-col"
+            style="background: var(--color-secondary); border: var(--border-style); box-shadow: 0 8px 40px rgba(0,0,0,0.8);"
+            (click)="$event.stopPropagation()"
+          >
+            <!-- Hero image -->
+            @if (casePackage()?.briefingImageUrl) {
+              <div
+                class="w-full shrink-0"
+                style="aspect-ratio: 3/2; background: var(--color-surface)"
+              >
+                <img
+                  [src]="casePackage()!.briefingImageUrl"
+                  alt=""
+                  class="w-full h-full object-cover"
+                />
+              </div>
+            }
+            <!-- Text content -->
+            <div class="p-8 flex flex-col gap-4 text-center">
+              <p
+                class="text-(--color-accent) text-xs tracking-[0.5em] uppercase font-mono opacity-80"
+              >
+                Case Briefing
+              </p>
+              <h2
+                class="act-title-enter font-serif text-4xl font-bold leading-tight"
+                style="color: var(--color-text)"
+              >
+                {{ casePackage()?.metadata?.title }}
+              </h2>
+              <p class="text-base leading-relaxed opacity-70" style="color: var(--color-text)">
+                {{ casePackage()?.metadata?.briefing }}
+              </p>
+            </div>
+            <!-- Footer hint -->
+            <div
+              class="px-8 pb-6 flex items-center justify-center gap-2 cursor-pointer"
+              style="color: var(--color-text-muted)"
+              (click)="dismissBriefingOverlay()"
+            >
+              @if (ttsService.isPlaying()) {
+                <span class="material-icons mi-sm animate-pulse">volume_up</span>
+              } @else {
+                <span class="material-icons mi-sm animate-pulse">touch_app</span>
+              }
+              <span class="font-mono text-xs tracking-widest uppercase opacity-50">
+                {{ ttsService.isPlaying() ? 'Listening…' : 'Click to continue' }}
+              </span>
+            </div>
+          </div>
+        </div>
+      }
+
       <!-- Act Banner Overlay -->
       @if (showActBanner()) {
         <app-act-banner
@@ -577,6 +639,7 @@ type CaseFileImageLightbox = {
           [title]="actBannerTitle()"
           [summary]="actBannerSummary()"
           [imageUrl]="actBannerImageUrl()"
+          [caseId]="casePackage()?.id ?? ''"
           (dismissed)="onActBannerDismissed()"
         />
       }
@@ -707,7 +770,7 @@ type CaseFileImageLightbox = {
 
       <!-- ===== Case File Modal ===== -->
       @if (caseFileOpen()) {
-        <div class="fixed inset-0 z-60 bg-black/60" (click)="caseFileOpen.set(false)"></div>
+        <div class="fixed inset-0 z-60 bg-black/60" (click)="closeCaseFile()"></div>
 
         <div
           class="fixed inset-3 md:inset-6 z-70 flex flex-col rounded-xl overflow-hidden"
@@ -724,7 +787,7 @@ type CaseFileImageLightbox = {
             </h2>
             <button
               type="button"
-              (click)="caseFileOpen.set(false)"
+              (click)="closeCaseFile()"
               class="p-1.5 rounded opacity-50 hover:opacity-100 transition-opacity cursor-pointer"
               style="color: var(--color-text)"
             >
@@ -1575,6 +1638,7 @@ export class InvestigationView implements OnInit {
   private readonly toast = inject(ToastService);
   private readonly imageService = inject(ImageService);
   private readonly interviewService = inject(InterviewService);
+  readonly ttsService = inject(TtsService);
 
   readonly isLoading = signal(true);
   readonly casePackage = signal<CasePackage | null>(null);
@@ -1582,6 +1646,7 @@ export class InvestigationView implements OnInit {
   readonly activeDialogueLines = signal<DialogueLine[]>([]);
   readonly activeInterviewSuspect = signal<Suspect | null>(null);
   readonly revisitInterviewTranscript = signal<InterviewChatMessage[] | null>(null);
+  readonly showBriefingOverlay = signal(false);
   readonly showActBanner = signal(false);
   readonly actBannerTitle = signal('');
   readonly actBannerSummary = signal('');
@@ -1901,13 +1966,19 @@ export class InvestigationView implements OnInit {
       this.theme.applyTexture(repairedPkg.uiTheme.textureFamily);
       this.isLoading.set(false);
 
-      // Show Act I banner on fresh start (no events completed yet)
+      // On fresh start: show briefing overlay, then Act I banner after it's dismissed.
       const state = this.gsvc.state();
       if (state && state.currentAct === 1 && state.completedEventIds.length === 0) {
         this.currentActForBanner.set(1);
         this.actBannerTitle.set('Act I: The Investigation Begins');
         this.actBannerSummary.set(repairedPkg.metadata.act1Summary);
-        this.showActBanner.set(true);
+        this.showBriefingOverlay.set(true);
+        const briefing = repairedPkg.metadata.briefing;
+        if (briefing) {
+          setTimeout(() => {
+            this.ttsService.playNarration(repairedPkg.id, 'briefing', briefing, 'zeus').subscribe();
+          }, 400);
+        }
       }
 
       // Re-hydrate blob object URLs from the IndexedDB image cache (they don't survive page refresh)
@@ -1937,7 +2008,7 @@ export class InvestigationView implements OnInit {
   }
 
   revisitEvent(event: InvestigationEvent): void {
-    this.caseFileOpen.set(false);
+    this.closeCaseFile();
     this.replayingEventId.set(event.id);
     this.selectedEvent.set(event);
     this.recentClueIds.set([]);
@@ -2081,6 +2152,29 @@ export class InvestigationView implements OnInit {
 
   dismissHint(): void {
     this.activeHint.set(null);
+  }
+
+  readBriefingAloud(): void {
+    const briefing = this.casePackage()?.metadata?.briefing;
+    if (!briefing) return;
+    this.ttsService.speak(briefing, 'zeus').subscribe();
+  }
+
+  openCaseFile(): void {
+    this.caseFileOpen.set(true);
+    this.caseFileTab.set('briefing');
+  }
+
+  closeCaseFile(): void {
+    this.ttsService.stop();
+    this.caseFileOpen.set(false);
+  }
+
+  dismissBriefingOverlay(): void {
+    this.ttsService.stop();
+    this.showBriefingOverlay.set(false);
+    // Show Act I banner immediately after briefing is dismissed.
+    this.showActBanner.set(true);
   }
 
   goAccuse(): void {

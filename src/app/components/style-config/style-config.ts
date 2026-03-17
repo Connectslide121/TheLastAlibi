@@ -70,7 +70,7 @@ const COLOR_FIELDS: { field: keyof StyleValues; cssVar: string; label: string }[
 
     <!-- Drawer panel -->
     <section
-      class="absolute right-0 top-0 bottom-0 w-[360px] max-w-full flex flex-col overflow-hidden"
+      class="absolute right-0 top-0 bottom-0 w-90 max-w-full flex flex-col overflow-hidden"
       style="background: var(--color-secondary); border-left: var(--border-style); box-shadow: var(--shadow-style)"
       (click)="$event.stopPropagation()"
     >

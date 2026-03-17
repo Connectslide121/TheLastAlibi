@@ -6,19 +6,12 @@ import { ImageService } from '../../services/image.service';
 import { GameStateService } from '../../services/game-state.service';
 import { CaseStoreService } from '../../services/case-store.service';
 import { ThemeService } from '../../services/theme.service';
+import { TtsService } from '../../services/tts.service';
 import { LoadingScreenComponent } from '../../components';
 import { CasePackage } from '../../models';
 
 type Difficulty = 'easy' | 'normal' | 'hard' | 'genius';
-type Phase = 'loading' | 'briefing' | 'error';
-
-const CASE_TYPE_LABELS: Record<string, string> = {
-  murder: 'Murder Investigation',
-  theft: 'Theft Investigation',
-  disappearance: 'Missing Persons Case',
-  sabotage: 'Sabotage Investigation',
-  other: 'Criminal Investigation',
-};
+type Phase = 'loading' | 'error';
 
 @Component({
   selector: 'app-generate-view',
@@ -26,116 +19,33 @@ const CASE_TYPE_LABELS: Record<string, string> = {
   imports: [LoadingScreenComponent],
   template: `
     @if (phase() === 'loading') {
-      <app-loading-screen [steps]="llm.generationSteps()" />
-    } @else if (phase() === 'briefing') {
-      <!-- Case Briefing / Introduction Screen -->
-      <div
-        class="min-h-screen w-full flex flex-col items-center justify-center px-6 py-16"
-        style="background: var(--color-primary)"
-      >
+      @if (readyPkg()) {
+        <!-- Generation complete — show CTA on the loading screen -->
         <div
-          class="w-full max-w-2xl flex flex-col gap-8"
-          style="animation: briefingIn 0.7s ease both"
+          class="min-h-screen w-full flex flex-col items-center justify-center gap-8 px-6"
+          style="background: var(--color-primary)"
         >
-          <!-- Header badge -->
-          <div class="flex flex-col items-center gap-3 text-center">
-            <span
-              class="font-mono text-xs tracking-widest uppercase px-4 py-1.5 rounded-full"
-              style="border: var(--border-style); color: var(--color-accent); background: var(--color-surface)"
-            >
-              {{ caseTypeLabel() }}
-            </span>
-            <h1
-              class="font-heading text-4xl sm:text-5xl leading-tight"
-              style="color: var(--color-accent)"
-            >
-              {{ readyPkg()?.metadata?.title }}
-            </h1>
-            @if (readyPkg()?.metadata?.subtitle) {
-              <p
-                class="font-mono text-sm tracking-widest uppercase opacity-60"
-                style="color: var(--color-text)"
-              >
-                {{ readyPkg()?.metadata?.subtitle }}
-              </p>
-            }
-          </div>
-
-          <!-- Divider -->
-          <div class="w-full h-px opacity-30" style="background: var(--color-accent)"></div>
-
-          <!-- Setting pill -->
-          <div class="flex items-center gap-3">
-            <span
-              class="material-icons shrink-0"
-              style="color: var(--color-accent); font-size: 1.25rem"
-              >location_on</span
-            >
-            <span class="font-mono text-sm" style="color: var(--color-text-muted)">
-              {{ readyPkg()?.metadata?.setting }}
-            </span>
-          </div>
-
-          <!-- Hero image (appears once briefing image is generated) -->
-          @if (readyPkg()?.briefingImageUrl) {
-            <div
-              class="w-full rounded-lg overflow-hidden"
-              style="aspect-ratio: 3/2; border: var(--border-style); box-shadow: var(--shadow-style)"
-            >
-              <img
-                [src]="readyPkg()!.briefingImageUrl"
-                [alt]="readyPkg()?.metadata?.title"
-                class="w-full h-full object-cover"
-              />
-            </div>
-          } @else {
-            <!-- Skeleton while image loads -->
-            <div
-              class="w-full rounded-lg animate-pulse"
-              style="aspect-ratio: 3/2; background: var(--color-surface); border: var(--border-style)"
-            ></div>
-          }
-
-          <!-- Briefing text -->
           <div
-            class="rounded-lg p-6"
-            style="background: var(--color-secondary); border: var(--border-style)"
+            class="flex flex-col items-center gap-6"
+            style="animation: briefingIn 0.5s ease both"
           >
-            <p
-              class="font-mono text-xs tracking-widest uppercase mb-4 flex items-center gap-2"
-              style="color: var(--color-accent)"
+            <span class="material-icons" style="font-size: 3.5rem; color: var(--color-accent)"
+              >check_circle</span
             >
-              <span class="material-icons" style="font-size: 1rem">description</span>
-              Case Briefing
+            <h2 class="font-heading text-3xl text-center" style="color: var(--color-accent)">
+              {{ readyPkg()!.metadata.title }}
+            </h2>
+            <p class="font-mono text-sm text-center" style="color: var(--color-text-muted)">
+              Case ready — your investigation awaits.
             </p>
-            <p
-              class="leading-relaxed text-base"
-              style="font-family: var(--font-body); color: var(--color-text)"
-            >
-              {{ readyPkg()?.metadata?.briefing }}
-            </p>
-          </div>
-
-          <!-- Difficulty badge -->
-          <div class="flex justify-center">
-            <span
-              class="font-mono text-xs tracking-widest uppercase px-4 py-1.5 rounded-full opacity-60"
-              style="border: var(--border-style); color: var(--color-text-muted)"
-            >
-              Difficulty: {{ readyPkg()?.metadata?.difficulty ?? '' }}
-            </span>
-          </div>
-
-          <!-- CTA -->
-          <div class="flex flex-col items-center gap-4">
             <button
               type="button"
               (click)="beginInvestigation()"
-              class="px-10 py-4 rounded font-mono uppercase tracking-widest text-sm cursor-pointer transition-all hover:opacity-90 active:scale-95 flex items-center gap-3"
+              class="mt-2 px-10 py-4 rounded font-mono uppercase tracking-widest text-sm cursor-pointer transition-all hover:opacity-90 active:scale-95 flex items-center gap-3"
               style="background: var(--color-accent); color: var(--color-primary)"
             >
               <span class="material-icons" style="font-size: 1.25rem">search</span>
-              Begin Investigation
+              Go to Case
             </button>
             <button
               type="button"
@@ -148,21 +58,10 @@ const CASE_TYPE_LABELS: Record<string, string> = {
             </button>
           </div>
         </div>
-      </div>
-
-      <style>
-        @keyframes briefingIn {
-          from {
-            opacity: 0;
-            transform: translateY(20px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-      </style>
-    } @else {
+      } @else {
+        <app-loading-screen [steps]="llm.generationSteps()" />
+      }
+    } @else if (phase() === 'error') {
       <!-- Error state -->
       <div
         class="min-h-screen bg-(--color-primary) flex flex-col items-center justify-center gap-6 px-6"
@@ -194,6 +93,7 @@ export class GenerateView implements OnInit {
   private readonly debugTrace = inject(DebugTraceService);
   readonly llm = inject(LlmService);
   private readonly imageService = inject(ImageService);
+  private readonly ttsService = inject(TtsService);
   private readonly gameState = inject(GameStateService);
   private readonly caseStore = inject(CaseStoreService);
   private readonly theme = inject(ThemeService);
@@ -204,11 +104,6 @@ export class GenerateView implements OnInit {
 
   private difficulty: Difficulty = 'normal';
   private style = 'Classic noir illustration';
-
-  readonly caseTypeLabel = () => {
-    const type = this.readyPkg()?.metadata?.caseType ?? 'other';
-    return CASE_TYPE_LABELS[type] ?? CASE_TYPE_LABELS['other'];
-  };
 
   ngOnInit(): void {
     const nav = this.router.getCurrentNavigation();
@@ -234,7 +129,21 @@ export class GenerateView implements OnInit {
           this.caseStore.storeDebugTrace(pkg.id, this.debugTrace.snapshot()).subscribe(() => {
             this.gameState.initState(pkg.id);
             this.readyPkg.set(pkg);
-            this.phase.set('briefing');
+            // Stay on loading phase — the template shows the Go to Case button
+            // once readyPkg is set.
+
+            // Pre-generate TTS narrations in the background (fire-and-forget).
+            this.ttsService
+              .preGenerateNarrations(pkg.id, [
+                { key: 'briefing', text: pkg.metadata.briefing },
+                {
+                  key: 'act1',
+                  text: `Act I: The Investigation Begins. ${pkg.metadata.act1Summary}`,
+                },
+                { key: 'act2', text: `Act II: Deeper Lies. ${pkg.metadata.act2Summary}` },
+                { key: 'act3', text: `Act III: The Final Deduction. ${pkg.metadata.act3Summary}` },
+              ])
+              .subscribe();
 
             // Continue loading images in the background so the briefing is usable immediately.
             this.llm.markImageStepActive();

@@ -4,4 +4,5 @@ export const environment = {
   production: true,
   workerBaseUrl,
   imageWorkerEndpoint: `${workerBaseUrl}/image`,
+  ttsWorkerEndpoint: `${workerBaseUrl}/tts`,
 };
