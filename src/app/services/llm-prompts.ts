@@ -150,9 +150,10 @@ export function buildSuspectsPrompt(f: CaseFoundation, style: string): string {
 
 // ── Step 3 — Locations ────────────────────────────────────────────────────────
 
-export function buildLocationsPrompt(f: CaseFoundation): string {
+export function buildLocationsPrompt(f: CaseFoundation, style: string): string {
   return (
     `Generate exactly 5 locations for the detective mystery "${f.title}" (${f.setting}).\n` +
+    `Visual style reference: ${styleReference(style)}.\n` +
     `Do NOT include a "cluesFoundHere" field.\n\n` +
     `Output ONLY raw JSON. No markdown fences.\n\n` +
     `{\n` +
@@ -162,7 +163,7 @@ export function buildLocationsPrompt(f: CaseFoundation): string {
     `      "name": "location name",\n` +
     `      "description": "what the detective observes here",\n` +
     `      "atmosphere": "sensory details — smell, light, sound",\n` +
-    `      "imagePrompt": "scene prompt for this location"\n` +
+    `      "imagePrompt": "${imagePromptTemplate(style, 'interior or exterior scene, [name], [atmosphere details]')}"\n` +
     `    }\n` +
     `  ]\n` +
     `}\n\n` +
@@ -177,6 +178,7 @@ export function buildCluesPrompt(
   culpritSuspectId: string,
   suspects: Suspect[],
   locations: LocationSpec[],
+  style: string,
 ): string {
   const culpritName = suspects.find((s) => s.id === culpritSuspectId)?.name ?? 'the culprit';
   const locationIds = locations.map((l) => l.id).join(', ');
@@ -185,6 +187,7 @@ export function buildCluesPrompt(
   return (
     `Generate exactly ${clueCount} clues for the detective mystery "${f.title}".\n` +
     `Setting: ${f.setting}\n` +
+    `Visual style reference: ${styleReference(style)}.\n` +
     `Culprit: ${culpritName} — method: ${f.method}\n` +
     `Key contradiction: ${f.keyContradiction}\n\n` +
     `Available location IDs (use exactly these as locationId values):\n` +
@@ -199,7 +202,7 @@ export function buildCluesPrompt(
     `      "locationId": "<must be from the list above>",\n` +
     `      "isRedHerring": false,\n` +
     `      "revealsInfo": "what this clue logically tells the detective",\n` +
-    `      "imagePrompt": "still life prompt"\n` +
+    `      "imagePrompt": "${imagePromptTemplate(style, 'close-up still life, [name], [physical description]')}"\n` +
     `    }\n` +
     `  ],\n` +
     `  "culpritClueIds": ["<2-3 clue ids that form the chain of evidence proving guilt>"],\n` +

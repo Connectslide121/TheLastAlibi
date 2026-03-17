@@ -99,7 +99,7 @@ export class LlmService {
         this.markDone(0);
         return forkJoin({
           suspectsResult: this.step2Suspects(foundation, stylePreference),
-          locations: this.step3Locations(foundation),
+          locations: this.step3Locations(foundation, stylePreference),
         }).pipe(
           map((r) => {
             this.markDone(1, 2);
@@ -116,7 +116,13 @@ export class LlmService {
       }),
       switchMap((ctx) => {
         return forkJoin({
-          clues: this.step4Clues(ctx.foundation, ctx.culpritSuspectId, ctx.suspects, ctx.locations),
+          clues: this.step4Clues(
+            ctx.foundation,
+            ctx.culpritSuspectId,
+            ctx.suspects,
+            ctx.locations,
+            ctx.style,
+          ),
           visual: this.step9Visual(ctx.foundation, ctx.suspects, ctx.style),
         }).pipe(
           map((r) => {
@@ -218,8 +224,8 @@ export class LlmService {
   // Step 3 — Locations
   // ---------------------------------------------------------------------------
 
-  private step3Locations(f: CaseFoundation): Observable<LocationSpec[]> {
-    return this.callAndParseJson<{ locations: LocationSpec[] }>(buildLocationsPrompt(f), {
+  private step3Locations(f: CaseFoundation, style: string): Observable<LocationSpec[]> {
+    return this.callAndParseJson<{ locations: LocationSpec[] }>(buildLocationsPrompt(f, style), {
       maxTokens: 1600,
       temperature: 0.7,
       debugMeta: { label: 'Locations', category: 'locations' },
@@ -235,9 +241,10 @@ export class LlmService {
     culpritSuspectId: string,
     suspects: Suspect[],
     locations: LocationSpec[],
+    style: string,
   ): Observable<CluesResult> {
     return this.callAndParseJson<CluesResult>(
-      buildCluesPrompt(f, culpritSuspectId, suspects, locations),
+      buildCluesPrompt(f, culpritSuspectId, suspects, locations, style),
       {
         maxTokens: 2400,
         temperature: 0.75,
