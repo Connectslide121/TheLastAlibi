@@ -227,6 +227,17 @@ type CaseFileImageLightbox = {
               [rewardClue]="activePuzzleRewardClue()"
               (puzzleSolved)="onPuzzleSolved($event)"
             />
+          } @else if (activeInterviewSuspect() && casePackage()) {
+            <!-- Interview Chat Mode -->
+            <app-interview-chat
+              class="flex-1 min-h-0 block"
+              [suspect]="activeInterviewSuspect()!"
+              [casePackage]="casePackage()!"
+              [foundClues]="foundClues()"
+              [sessionId]="gameState()?.sessionId ?? ''"
+              [revisitTranscript]="revisitInterviewTranscript()"
+              (interviewClosed)="onInterviewClosed()"
+            />
           } @else if (selectedEvent()) {
             <!-- Searchable Room / Narration Mode -->
             <div class="max-w-2xl w-full">
@@ -280,12 +291,6 @@ type CaseFileImageLightbox = {
                             {{ spot.label }}
                           </span>
                         </div>
-                        @if (spot.rewardsClueId) {
-                          <span class="text-xs font-mono text-(--color-text-muted)">
-                            <span class="material-icons mi-sm">article</span>
-                            Evidence here
-                          </span>
-                        }
                       </button>
                     }
                   </div>
@@ -1545,16 +1550,6 @@ type CaseFileImageLightbox = {
       }
 
       <!-- ===== LLM Interview Chat ===== -->
-      @if (activeInterviewSuspect() && casePackage()) {
-        <app-interview-chat
-          [suspect]="activeInterviewSuspect()!"
-          [casePackage]="casePackage()!"
-          [foundClues]="foundClues()"
-          [sessionId]="gameState()?.sessionId ?? ''"
-          [revisitTranscript]="revisitInterviewTranscript()"
-          (interviewClosed)="onInterviewClosed()"
-        />
-      }
 
       <style>
         @keyframes fadeIn {
@@ -1973,7 +1968,9 @@ export class InvestigationView implements OnInit {
 
   onInterviewClosed(): void {
     const event = this.selectedEvent();
-    if (event && !this.isReplayingEvent(event.id)) this.completeCurrentEvent(event);
+    if (event && !this.isReplayingEvent(event.id) && this.interviewService.allRequiredRevealed()) {
+      this.completeCurrentEvent(event);
+    }
     this.activeInterviewSuspect.set(null);
     this.revisitInterviewTranscript.set(null);
     this.replayingEventId.set(null);
@@ -2010,6 +2007,17 @@ export class InvestigationView implements OnInit {
     this.activeSpot.set(spot);
     if (!this.examinedSpotIds().includes(spot.id)) {
       this.examinedSpotIds.update((ids) => [...ids, spot.id]);
+
+      if (spot.rewardsClueId) {
+        const pkg = this.casePackage();
+        const state = this.gsvc.state();
+        const clue = pkg?.clues.find((c) => c.id === spot.rewardsClueId);
+        if (clue && state && !state.foundClueIds.includes(clue.id)) {
+          this.gsvc.discoverClue(clue.id);
+          this.gsvc.visitLocation(clue.locationId);
+          this.enqueueUnlockSpotlights([clue], []);
+        }
+      }
     }
   }
 
@@ -2111,7 +2119,20 @@ export class InvestigationView implements OnInit {
     const state = this.gsvc.state();
     if (!pkg || !state) return;
 
-    const rewardClueIds = this.rewardClueIdsForEvent(event, pkg);
+    // For investigation events with examination spots, clues are discovered
+    // individually via examineSpot(). Only award non-spot clues here to avoid
+    // gifting evidence the player never found, or double-awarding spot clues.
+    const spotClueIds = new Set(
+      (event.examinationSpots ?? []).map((s) => s.rewardsClueId).filter(Boolean) as string[],
+    );
+    const hasSpots = spotClueIds.size > 0;
+
+    const allRewardIds = this.rewardClueIdsForEvent(event, pkg);
+    // If the event uses examination spots, limit auto-awards to non-spot rewards only.
+    const rewardClueIds = hasSpots
+      ? allRewardIds.filter((id) => !spotClueIds.has(id))
+      : allRewardIds;
+
     const unlockSuspectIds = event.unlocksSuspectIds ?? [];
 
     const newlyFoundClues = rewardClueIds
