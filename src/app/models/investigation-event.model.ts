@@ -3,6 +3,16 @@ export interface UnlockCondition {
   referenceId: string;
 }
 
+/** One clickable hotspot inside a searchable-room investigation event. */
+export interface ExaminationSpot {
+  id: string;
+  label: string;
+  /** Atmospheric description the player reads when they inspect this spot. */
+  description: string;
+  /** If set, examining this spot reveals the clue with this ID. */
+  rewardsClueId?: string;
+}
+
 export interface InvestigationEvent {
   id: string;
   category: 'investigation' | 'social' | 'surprise' | 'puzzle' | 'deduction';
@@ -17,4 +27,6 @@ export interface InvestigationEvent {
   puzzleId?: string;
   dialogueSuspectId?: string;
   narration: string;
+  /** Populated for category === 'investigation' events. */
+  examinationSpots?: ExaminationSpot[];
 }

@@ -136,9 +136,7 @@ import { InterviewService, InterviewChatMessage } from '../../services/interview
                   class="w-7 h-7 rounded-full shrink-0 mt-0.5 flex items-center justify-center"
                   style="background: var(--color-surface);"
                 >
-                  <span
-                    class="material-icons"
-                    style="font-size: 0.9rem; color: var(--color-accent)"
+                  <span class="material-icons" style="font-size: 0.9rem; color: var(--color-accent)"
                     >record_voice_over</span
                   >
                 </div>
@@ -161,9 +159,7 @@ import { InterviewService, InterviewChatMessage } from '../../services/interview
                   class="w-7 h-7 rounded-full shrink-0 mt-0.5 flex items-center justify-center"
                   style="background: rgba(201,168,76,0.18);"
                 >
-                  <span
-                    class="material-icons"
-                    style="font-size: 0.9rem; color: var(--color-accent)"
+                  <span class="material-icons" style="font-size: 0.9rem; color: var(--color-accent)"
                     >manage_search</span
                   >
                 </div>
@@ -217,7 +213,13 @@ import { InterviewService, InterviewChatMessage } from '../../services/interview
         </div>
 
         <!-- ─── Suggested question chips ─── -->
-        @if (suggestedQuestions().length > 0 && !isComplete() && !pendingCompletion() && !isLoading() && !isReadOnly()) {
+        @if (
+          suggestedQuestions().length > 0 &&
+          !isComplete() &&
+          !pendingCompletion() &&
+          !isLoading() &&
+          !isReadOnly()
+        ) {
           <div
             class="shrink-0 px-4 py-2.5 flex gap-2 flex-wrap"
             style="border-top: 1px solid rgba(255,255,255,0.06);"
@@ -351,7 +353,10 @@ import { InterviewService, InterviewChatMessage } from '../../services/interview
                 Interview Complete
               </h3>
             </div>
-            <p class="font-mono text-xs uppercase tracking-widest" style="color: var(--color-text-muted)">
+            <p
+              class="font-mono text-xs uppercase tracking-widest"
+              style="color: var(--color-text-muted)"
+            >
               {{ suspect().name }} — {{ suspect().occupation }}
             </p>
             <p
@@ -371,7 +376,9 @@ import { InterviewService, InterviewChatMessage } from '../../services/interview
                   <span
                     class="material-icons shrink-0"
                     style="font-size: 1.1rem;"
-                    [style.color]="secret.revealed ? 'var(--color-accent)' : 'rgba(255,255,255,0.2)'"
+                    [style.color]="
+                      secret.revealed ? 'var(--color-accent)' : 'rgba(255,255,255,0.2)'
+                    "
                   >
                     {{ secret.revealed ? 'check_circle' : 'radio_button_unchecked' }}
                   </span>

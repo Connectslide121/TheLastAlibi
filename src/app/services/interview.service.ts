@@ -38,7 +38,9 @@ export class InterviewService {
   readonly revealedCount = computed(() => this.secrets().filter((s) => s.revealed).length);
   readonly totalCount = computed(() => this.secrets().length);
   readonly allRequiredRevealed = computed(() =>
-    this.secrets().filter((s) => s.required).every((s) => s.revealed),
+    this.secrets()
+      .filter((s) => s.required)
+      .every((s) => s.revealed),
   );
 
   private systemPrompt = '';
@@ -126,9 +128,7 @@ export class InterviewService {
 
             if (parsed.revealedKeys.length > 0) {
               this.secrets.update((ss) =>
-                ss.map((s) =>
-                  parsed.revealedKeys.includes(s.key) ? { ...s, revealed: true } : s,
-                ),
+                ss.map((s) => (parsed.revealedKeys.includes(s.key) ? { ...s, revealed: true } : s)),
               );
             }
 

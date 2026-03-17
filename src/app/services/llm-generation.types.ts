@@ -3,6 +3,7 @@ import {
   Clue,
   InvestigationEvent,
   UnlockCondition,
+  ExaminationSpot,
   PuzzleEvent,
   Hint,
   SolutionExplanation,
@@ -69,6 +70,7 @@ export interface EventSpec {
   puzzleLabel: string | null;
   dialogueSuspectId: string | null;
   narration: string;
+  examinationSpots: ExaminationSpot[] | null;
 }
 
 export interface PuzzleConcept {

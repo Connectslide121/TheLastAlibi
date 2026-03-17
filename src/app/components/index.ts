@@ -10,3 +10,4 @@ export * from './toast/toast.service';
 export * from './toast/toast';
 export * from './act-banner/act-banner';
 export * from './debug-dashboard/debug-dashboard';
+export * from './style-config/style-config';

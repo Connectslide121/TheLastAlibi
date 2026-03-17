@@ -17,10 +17,12 @@ import {
   ToastService,
   LocationCardComponent,
   InterviewChatComponent,
+  StyleConfigComponent,
 } from '../../components';
 import {
   CasePackage,
   InvestigationEvent,
+  ExaminationSpot,
   Suspect,
   Clue,
   PuzzleEvent,
@@ -49,6 +51,7 @@ type CaseFileImageLightbox = {
     DebugDashboardComponent,
     LocationCardComponent,
     InterviewChatComponent,
+    StyleConfigComponent,
   ],
   template: `
     <div class="h-screen flex flex-col bg-(--color-primary)">
@@ -84,6 +87,16 @@ type CaseFileImageLightbox = {
         >
           <span class="material-icons mi-sm">bug_report</span>
           Debug
+        </button>
+        <button
+          type="button"
+          (click)="styleConfigOpen.set(true)"
+          class="px-3 py-1.5 text-xs font-mono uppercase tracking-widest rounded cursor-pointer border hover:opacity-80 transition-opacity flex items-center gap-1"
+          style="border-color: rgba(255,255,255,0.2); color: var(--color-text-muted)"
+          title="Customize styles"
+        >
+          <span class="material-icons mi-sm">palette</span>
+          Styles
         </button>
         <h1 class="font-heading text-lg text-(--color-accent) truncate flex-1">
           {{ casePackage()?.metadata?.title ?? 'The Last Alibi' }}
@@ -215,44 +228,153 @@ type CaseFileImageLightbox = {
               (puzzleSolved)="onPuzzleSolved($event)"
             />
           } @else if (selectedEvent()) {
-            <!-- Narration / Investigation Mode -->
-            <div class="max-w-2xl">
+            <!-- Searchable Room / Narration Mode -->
+            <div class="max-w-2xl w-full">
               <h2 class="font-heading text-2xl text-(--color-accent) mb-3">
                 {{ selectedEvent()!.title }}
               </h2>
-              <p class="text-(--color-text) leading-relaxed mb-6 font-body">
+              <p class="text-(--color-text) leading-relaxed mb-6 font-body italic">
                 {{ selectedEvent()!.narration }}
               </p>
-              @if (recentClues().length > 0) {
+
+              @if (activeExaminationSpots().length > 0) {
+                <!-- Spot grid -->
                 <div class="mb-6">
-                  <h3
-                    class="font-mono text-xs uppercase text-(--color-text-muted) tracking-widest mb-3"
+                  <p
+                    class="font-mono text-xs uppercase tracking-widest text-(--color-text-muted) mb-3"
                   >
-                    <span class="material-icons mi-sm">article</span>
-                    Evidence Found
-                  </h3>
-                  <div class="flex flex-col gap-3">
-                    @for (clue of recentClues(); track clue.id) {
+                    <span class="material-icons mi-sm">search</span>
+                    Examine the scene
+                  </p>
+                  <div class="grid grid-cols-2 gap-3">
+                    @for (spot of activeExaminationSpots(); track spot.id) {
                       <button
                         type="button"
-                        class="w-full text-left cursor-pointer hover:opacity-90 transition-opacity"
-                        (click)="onClueClicked(clue)"
+                        (click)="examineSpot(spot)"
+                        class="text-left p-3 rounded-lg border cursor-pointer transition-all hover:scale-[1.01]"
+                        [class.opacity-50]="
+                          examinedSpotIds().includes(spot.id) && !spot.rewardsClueId
+                        "
+                        [style.border-color]="
+                          activeSpot()?.id === spot.id
+                            ? 'var(--color-accent)'
+                            : 'rgba(255,255,255,0.15)'
+                        "
+                        [style.background]="
+                          activeSpot()?.id === spot.id ? 'rgba(255,255,255,0.07)' : 'transparent'
+                        "
                       >
-                        <app-clue-card [clue]="clue" [showTruth]="false" />
+                        <div class="flex items-center gap-2 mb-1">
+                          <span class="material-icons mi-sm text-(--color-accent)">
+                            {{
+                              examinedSpotIds().includes(spot.id)
+                                ? spot.rewardsClueId
+                                  ? 'check_circle'
+                                  : 'radio_button_checked'
+                                : 'radio_button_unchecked'
+                            }}
+                          </span>
+                          <span
+                            class="font-mono text-xs uppercase tracking-wider text-(--color-accent)"
+                          >
+                            {{ spot.label }}
+                          </span>
+                        </div>
+                        @if (spot.rewardsClueId) {
+                          <span class="text-xs font-mono text-(--color-text-muted)">
+                            <span class="material-icons mi-sm">article</span>
+                            Evidence here
+                          </span>
+                        }
                       </button>
                     }
                   </div>
                 </div>
+
+                <!-- Active spot detail panel -->
+                @if (activeSpot()) {
+                  <div
+                    class="mb-6 p-4 rounded-lg border"
+                    style="border-color: var(--color-accent); background: rgba(255,255,255,0.04);"
+                  >
+                    <h3
+                      class="font-mono text-sm uppercase tracking-widest text-(--color-accent) mb-2"
+                    >
+                      <span class="material-icons mi-sm">manage_search</span>
+                      {{ activeSpot()!.label }}
+                    </h3>
+                    <p class="text-(--color-text) leading-relaxed font-body mb-3">
+                      {{ activeSpot()!.description }}
+                    </p>
+                    @if (activeSpot()!.rewardsClueId) {
+                      @let spotClue = getClueById(activeSpot()!.rewardsClueId!);
+                      @if (spotClue) {
+                        <div class="mt-3">
+                          <p
+                            class="font-mono text-xs uppercase tracking-widest text-(--color-text-muted) mb-2"
+                          >
+                            <span class="material-icons mi-sm">article</span>
+                            Evidence discovered
+                          </p>
+                          <app-clue-card [clue]="spotClue" [showTruth]="false" />
+                        </div>
+                      }
+                    }
+                  </div>
+                }
+
+                <!-- Leave scene button -->
+                <button
+                  type="button"
+                  (click)="finishNarration()"
+                  [disabled]="!canLeaveScene()"
+                  class="px-6 py-2.5 rounded border font-mono uppercase tracking-widest text-sm transition-opacity"
+                  [class.cursor-pointer]="canLeaveScene()"
+                  [class.cursor-not-allowed]="!canLeaveScene()"
+                  [class.opacity-40]="!canLeaveScene()"
+                  [class.hover:opacity-80]="canLeaveScene()"
+                  style="border-color: var(--color-accent); color: var(--color-accent);"
+                >
+                  <span class="material-icons mi-sm">exit_to_app</span>
+                  @if (canLeaveScene()) {
+                    Leave the scene
+                  } @else {
+                    Find the evidence first
+                  }
+                </button>
+              } @else {
+                <!-- Fallback: no spots, show old narration + continue -->
+                @if (recentClues().length > 0) {
+                  <div class="mb-6">
+                    <h3
+                      class="font-mono text-xs uppercase text-(--color-text-muted) tracking-widest mb-3"
+                    >
+                      <span class="material-icons mi-sm">article</span>
+                      Evidence Found
+                    </h3>
+                    <div class="flex flex-col gap-3">
+                      @for (clue of recentClues(); track clue.id) {
+                        <button
+                          type="button"
+                          class="w-full text-left cursor-pointer hover:opacity-90 transition-opacity"
+                          (click)="onClueClicked(clue)"
+                        >
+                          <app-clue-card [clue]="clue" [showTruth]="false" />
+                        </button>
+                      }
+                    </div>
+                  </div>
+                }
+                <button
+                  type="button"
+                  (click)="finishNarration()"
+                  class="px-6 py-2.5 rounded border font-mono uppercase tracking-widest text-sm cursor-pointer hover:opacity-80 transition-opacity"
+                  style="border-color: var(--color-accent); color: var(--color-accent);"
+                >
+                  <span class="material-icons mi-sm">arrow_forward</span>
+                  Continue
+                </button>
               }
-              <button
-                type="button"
-                (click)="finishNarration()"
-                class="px-6 py-2.5 rounded border font-mono uppercase tracking-widest text-sm cursor-pointer hover:opacity-80 transition-opacity"
-                style="border-color: var(--color-accent); color: var(--color-accent);"
-              >
-                <span class="material-icons mi-sm">arrow_forward</span>
-                Continue
-              </button>
             </div>
           } @else {
             <!-- Event Selection -->
@@ -1415,6 +1537,13 @@ type CaseFileImageLightbox = {
         <app-debug-dashboard [casePackage]="pkg" (closeRequested)="debugDashboardOpen.set(false)" />
       }
 
+      @if (styleConfigOpen()) {
+        <app-style-config
+          [originalTheme]="casePackage()?.uiTheme ?? null"
+          (closed)="styleConfigOpen.set(false)"
+        />
+      }
+
       <!-- ===== LLM Interview Chat ===== -->
       @if (activeInterviewSuspect() && casePackage()) {
         <app-interview-chat
@@ -1476,6 +1605,21 @@ export class InvestigationView implements OnInit {
           : '';
   });
   readonly recentClueIds = signal<string[]>([]);
+  readonly examinedSpotIds = signal<string[]>([]);
+  readonly activeSpot = signal<ExaminationSpot | null>(null);
+
+  readonly activeExaminationSpots = computed((): ExaminationSpot[] => {
+    return this.selectedEvent()?.examinationSpots ?? [];
+  });
+
+  readonly canLeaveScene = computed((): boolean => {
+    const spots = this.activeExaminationSpots();
+    if (spots.length === 0) return true;
+    const clueSpots = spots.filter((s) => !!s.rewardsClueId);
+    if (clueSpots.length === 0) return true;
+    const examined = this.examinedSpotIds();
+    return clueSpots.every((s) => examined.includes(s.id));
+  });
   readonly sidebarOpen = signal(true);
   readonly activeHint = signal<Hint | null>(null);
   readonly caseFileOpen = signal(false);
@@ -1487,6 +1631,7 @@ export class InvestigationView implements OnInit {
   readonly replayingEventId = signal<string | null>(null);
   readonly unlockSpotlight = signal<UnlockSpotlight | null>(null);
   readonly debugDashboardOpen = signal(false);
+  readonly styleConfigOpen = signal(false);
 
   readonly gameState = this.gsvc.state;
   readonly isAccusationUnlocked = this.gsvc.isAccusationUnlocked;
@@ -1781,17 +1926,15 @@ export class InvestigationView implements OnInit {
     this.replayingEventId.set(null);
     this.selectedEvent.set(event);
     this.recentClueIds.set([]);
+    this.examinedSpotIds.set([]);
+    this.activeSpot.set(null);
 
     if (event.dialogueSuspectId) {
       const suspect = this.casePackage()?.suspects.find((s) => s.id === event.dialogueSuspectId);
       if (suspect) {
         this.gsvc.interviewSuspect(event.dialogueSuspectId);
-        if (event.category === 'social') {
-          this.revisitInterviewTranscript.set(null);
-          this.activeInterviewSuspect.set(suspect);
-        } else {
-          this.activeDialogueLines.set(suspect.interviewDialogue);
-        }
+        this.revisitInterviewTranscript.set(null);
+        this.activeInterviewSuspect.set(suspect);
       }
     } else if (event.category !== 'puzzle') {
       this.activeDialogueLines.set([]);
@@ -1806,14 +1949,14 @@ export class InvestigationView implements OnInit {
 
     if (event.dialogueSuspectId) {
       const suspect = this.casePackage()?.suspects.find((s) => s.id === event.dialogueSuspectId);
-      if (event.category === 'social' && suspect) {
+      if (suspect) {
         const sessionId = this.gameState()?.sessionId ?? '';
         const stored = this.interviewService.getStoredTranscript(sessionId, suspect.id);
         this.revisitInterviewTranscript.set(stored);
         this.activeInterviewSuspect.set(suspect);
-        return;
+      } else {
+        this.activeDialogueLines.set([]);
       }
-      this.activeDialogueLines.set(suspect?.interviewDialogue ?? []);
       return;
     }
 
@@ -1859,6 +2002,19 @@ export class InvestigationView implements OnInit {
     this.recentClueIds.set([]);
     this.replayingEventId.set(null);
     this.selectedEvent.set(null);
+    this.examinedSpotIds.set([]);
+    this.activeSpot.set(null);
+  }
+
+  examineSpot(spot: ExaminationSpot): void {
+    this.activeSpot.set(spot);
+    if (!this.examinedSpotIds().includes(spot.id)) {
+      this.examinedSpotIds.update((ids) => [...ids, spot.id]);
+    }
+  }
+
+  getClueById(id: string): Clue | undefined {
+    return this.casePackage()?.clues.find((c) => c.id === id);
   }
 
   onSuspectClicked(suspect: Suspect): void {

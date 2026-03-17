@@ -283,7 +283,13 @@ export function buildEventGraphPrompt(
     `      "unlocksSuspectIds": [],\n` +
     `      "puzzleLabel": null,\n` +
     `      "dialogueSuspectId": null,\n` +
-    `      "narration": "2-3 sentence scene description"\n` +
+    `      "narration": "2-3 sentence scene description",\n` +
+    `      "examinationSpots": [\n` +
+    `        { "id": "spot-bookshelf", "label": "Dusty Bookshelf", "description": "Rows of untouched volumes — except one gap where a book was recently removed.", "rewardsClueId": null },\n` +
+    `        { "id": "spot-window", "label": "Cracked Window", "description": "The latch is broken from the inside. Someone left in a hurry.", "rewardsClueId": null },\n` +
+    `        { "id": "spot-desk-drawer", "label": "Locked Desk Drawer", "description": "A crumpled receipt jammed under the lock reveals a meeting time.", "rewardsClueId": "clue-id-here" },\n` +
+    `        { "id": "spot-fireplace", "label": "Cold Fireplace", "description": "Ash is fresh — something was burned within the last hour.", "rewardsClueId": null }\n` +
+    `      ]\n` +
     `    }\n` +
     `  ]\n` +
     `}\n\n` +
@@ -299,6 +305,11 @@ export function buildEventGraphPrompt(
     `- unlockConditions referenceId must exist in the clue IDs, suspect IDs, or other event IDs in this array\n` +
     `- Do NOT create circular unlock conditions\n` +
     `- Key culprit clues (${clues.culpritClueIds.join(', ')}) should be rewards in Act 2-3 events\n` +
+    `- Every event with category "investigation" MUST include an "examinationSpots" array with exactly 4-6 spots\n` +
+    `- Each spot must have: "id" (kebab-case, unique within the event), "label" (2-4 words), "description" (1-2 atmospheric sentences, either a dead end or a clue reveal), "rewardsClueId" (a clue ID string OR null)\n` +
+    `- Investigation events: exactly 1-2 spots should have a non-null rewardsClueId; remaining spots are atmospheric dead ends\n` +
+    `- rewardsClueId values in spots must match the event's own rewardsClueIds array entries (one spot per rewarded clue)\n` +
+    `- Social, puzzle, surprise, and deduction events must have examinationSpots: null\n` +
     `\nCRITICAL COVERAGE REQUIREMENT — the player must be able to discover everything by the end of Act 3:\n` +
     `- EVERY suspect ID (${suspectIds}) must appear in at least one event: either as a dialogueSuspectId OR inside an event's unlocksSuspectIds. No suspect may be permanently hidden.\n` +
     `- EVERY clue ID (${clueIds}) must appear in at least one event's rewardsClueIds. No clue may be permanently undiscoverable.\n` +

@@ -451,6 +451,7 @@ export class LlmService {
       puzzleId: e.puzzleLabel ? (labelToId.get(e.puzzleLabel) ?? undefined) : undefined,
       dialogueSuspectId: e.dialogueSuspectId ?? undefined,
       narration: e.narration,
+      examinationSpots: e.examinationSpots ?? undefined,
     }));
 
     // Repair any silent deadlocks before storing the case.
