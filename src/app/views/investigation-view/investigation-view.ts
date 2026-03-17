@@ -1941,9 +1941,14 @@ export class InvestigationView implements OnInit {
       return;
     }
 
-    // Load or resume game state first
+    // Load or resume game state first.
+    // If loadState returns null (e.g. after "Play Again" cleared the state), create a fresh one
+    // so the investigation starts from the beginning for the existing case package.
     if (!this.gsvc.state() || this.gsvc.state()?.sessionId !== sessionId) {
-      this.gsvc.loadState(sessionId);
+      const loaded = this.gsvc.loadState(sessionId);
+      if (!loaded) {
+        this.gsvc.initState(sessionId);
+      }
     }
 
     this.caseStore.loadCase(sessionId).subscribe((pkg) => {
