@@ -98,6 +98,9 @@ import { CasePackage, Suspect, Clue } from '../../models';
             @if (gameState()?.hintsUsed) {
               <span>Hints: −{{ (gameState()?.hintsUsed ?? 0) * 50 }}</span>
             }
+            @if (gameState()?.puzzleRevealsUsed) {
+              <span>Puzzles revealed: −{{ (gameState()?.puzzleRevealsUsed ?? 0) * 100 }}</span>
+            }
             @if (!isCulpritCorrect()) {
               <span>Wrong accusation: −300</span>
             } @else if (!isMethodMatched()) {
@@ -695,6 +698,7 @@ export class RevealView implements OnInit {
 
     // Deduct for hints
     points -= state.hintsUsed * 50;
+    points -= (state.puzzleRevealsUsed ?? 0) * 100;
 
     if (!this.isCulpritCorrect()) {
       points -= 300;

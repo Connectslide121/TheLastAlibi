@@ -14,7 +14,7 @@ import {
 } from '../models';
 import { DebugRequestMeta } from './debug-trace.service';
 import { WorkerLlmService, isQuotaError } from './worker-llm';
-import { repairEventGraph } from '../utils/event-graph-repair';
+import { makeIdResolver } from '../utils/case-integrity';
 import { normalizeCasePackage } from '../utils/normalize-case-package';
 import { validatePuzzleConcept } from '../utils/puzzle-concept-validation';
 
@@ -107,7 +107,11 @@ export class LlmService {
               difficulty,
               style: stylePreference,
               foundation,
-              culpritSuspectId: r.suspectsResult.culpritSuspectId,
+              culpritSuspectId: resolveCulpritId(
+                r.suspectsResult.culpritSuspectId,
+                r.suspectsResult.suspects,
+                foundation.culpritLabel,
+              ),
               suspects: r.suspectsResult.suspects,
               locations: r.locations,
             };
@@ -216,7 +220,7 @@ export class LlmService {
   ): Observable<{ culpritSuspectId: string; suspects: Suspect[] }> {
     return this.callAndParseJson<{ culpritSuspectId: string; suspects: Suspect[] }>(
       buildSuspectsPrompt(f, style),
-      { maxTokens: 3200, temperature: 0.8, debugMeta: { label: 'Suspects', category: 'suspects' } },
+      { maxTokens: 4200, temperature: 0.8, debugMeta: { label: 'Suspects', category: 'suspects' } },
     );
   }
 
@@ -279,11 +283,11 @@ export class LlmService {
     return this.callAndParseJson<{ events: EventSpec[] }>(
       buildEventGraphPrompt(f, suspects, culpritSuspectId, clues, difficulty),
       {
-        maxTokens: 3200,
+        maxTokens: 4000,
         temperature: 0.75,
         debugMeta: { label: 'Investigation Events', category: 'event-graph' },
       },
-    ).pipe(map((r) => r.events));
+    ).pipe(map((r) => canonicalizeEventSpecs(r.events ?? [], clues)));
   }
 
   // ---------------------------------------------------------------------------
@@ -461,8 +465,8 @@ export class LlmService {
       examinationSpots: e.examinationSpots ?? undefined,
     }));
 
-    // Repair any silent deadlocks before storing the case.
-    const eventGraph = repairEventGraph(rawEventGraph);
+    // Deadlock / reachability repair happens in normalizeCasePackage → ensureCaseIntegrity.
+    const eventGraph = rawEventGraph;
 
     // Derive cluesFoundHere for each location (invert clue.locationId)
     const cluesByLocation = new Map<string, string[]>();
@@ -709,4 +713,46 @@ export class LlmService {
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#39;');
   }
+}
+
+/**
+ * The suspects step names its culprit by ID, but models often invent a slightly
+ * different ID than the one they gave the suspect. Snap it to a real suspect,
+ * falling back to matching the foundation's culpritLabel against each profile.
+ */
+function resolveCulpritId(rawId: string, suspects: Suspect[], culpritLabel: string): string {
+  const resolved = makeIdResolver(
+    suspects.map((s) => s.id),
+    'suspect',
+  )(rawId);
+  if (resolved) return resolved;
+  const label = (culpritLabel ?? '').toLowerCase();
+  const byLabel = suspects.find((s) =>
+    [s.occupation, s.relationship, s.name].some((field) => {
+      const f = (field ?? '').toLowerCase();
+      return f && label && (f.includes(label) || label.includes(f));
+    }),
+  );
+  const fallback = byLabel ?? suspects.find((s) => s.isLying) ?? suspects[0];
+  console.warn(`[Generation] culpritSuspectId "${rawId}" resolved to "${fallback?.id}"`);
+  return fallback?.id ?? rawId;
+}
+
+/**
+ * Snap event reward IDs onto real clues before anything downstream (puzzle
+ * concepts take a puzzle event's first reward as the puzzle's prize).
+ */
+function canonicalizeEventSpecs(events: EventSpec[], clues: CluesResult): EventSpec[] {
+  const clueId = makeIdResolver(
+    clues.clues.map((c) => c.id),
+    'clue',
+  );
+  return events.map((e) => ({
+    ...e,
+    rewardsClueIds: [
+      ...new Set((e.rewardsClueIds ?? []).map(clueId).filter((id): id is string => !!id)),
+    ],
+    unlocksSuspectIds: e.unlocksSuspectIds ?? [],
+    unlockConditions: e.unlockConditions ?? [],
+  }));
 }

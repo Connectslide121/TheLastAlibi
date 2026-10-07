@@ -106,14 +106,17 @@ export function buildSuspectsPrompt(f: CaseFoundation, style: string): string {
   return (
     `Generate all suspects for the detective mystery "${f.title}" (${f.setting}).\n` +
     `Visual style reference: ${styleReference(style)}.\n` +
-    `The culprit is the suspect matching label "${f.culpritLabel}".\n\n` +
+    `The culprit is the suspect matching label "${f.culpritLabel}".\n` +
+    `SECRET GROUND TRUTH (keep every suspect consistent with it): ${f.trueTimeline}\n` +
+    `Method: ${f.method}. Motive: ${f.motive}.\n` +
+    `The fact that exposes the culprit (ONLY the culprit's lie may touch this): ${f.keyContradiction}\n\n` +
     `Suspect labels: ${f.suspectLabels.map((l, i) => `${i + 1}. "${l}"`).join('; ')}\n` +
     `lyingSuspectLabels: ${JSON.stringify(f.lyingSuspectLabels)}\n` +
     `mistakenSuspectLabels: ${JSON.stringify(f.mistakenSuspectLabels)}\n` +
     `hidingSecretSuspectLabels: ${JSON.stringify(f.hidingSecretSuspectLabels)}\n\n` +
     `Output ONLY raw JSON. No markdown fences.\n\n` +
     `{\n` +
-    `  "culpritSuspectId": "suspect-<kebab-name-of-culprit>",\n` +
+    `  "culpritSuspectId": "<the exact id you give the culprit below>",\n` +
     `  "suspects": [\n` +
     `    {\n` +
     `      "id": "suspect-<kebab-case>",\n` +
@@ -128,6 +131,10 @@ export function buildSuspectsPrompt(f: CaseFoundation, style: string): string {
     `      "isLying": false,\n` +
     `      "isMistaken": false,\n` +
     `      "isHidingSecret": false,\n` +
+    `      "trueWhereabouts": "where they ACTUALLY were and what they actually did during the crime",\n` +
+    `      "lieAbout": "if isLying: the specific thing THIS suspect lies about and why; otherwise empty string",\n` +
+    `      "mistakenBelief": "if isMistaken: the specific thing they honestly misremember; otherwise empty string",\n` +
+    `      "knownFacts": ["2-3 things they genuinely saw or know that bear on the case"],\n` +
     `      "interviewDialogue": [\n` +
     `        { "speakerId": "suspect-id", "speakerName": "Name", "text": "interview line", "revealsTruth": false },\n` +
     `        { "speakerId": "suspect-id", "speakerName": "Name", "text": "interview line", "revealsTruth": true },\n` +
@@ -143,6 +150,9 @@ export function buildSuspectsPrompt(f: CaseFoundation, style: string): string {
     `- Suspects with matching lyingSuspectLabels also have isLying: true\n` +
     `- Suspects with matching mistakenSuspectLabels have isMistaken: true\n` +
     `- Suspects with matching hidingSecretSuspectLabels have isHidingSecret: true\n` +
+    `- culpritSuspectId MUST be exactly the id of the culprit's entry in suspects\n` +
+    `- Every innocent liar lies about something of their OWN (an affair, a debt, being somewhere they shouldn't) — never about the culprit's exposing fact\n` +
+    `- trueWhereabouts, alibi and knownFacts must all agree with the ground truth; for the culprit, alibi is the false story and trueWhereabouts is what really happened\n` +
     `- Each suspect has exactly 4 interviewDialogue entries\n` +
     `- speakerId in each dialogue entry must match that suspect's id`
   );
@@ -297,20 +307,24 @@ export function buildEventGraphPrompt(
     `  ]\n` +
     `}\n\n` +
     `Rules:\n` +
-    `- Generate 6-9 events spread across acts 1, 2, and 3\n` +
+    `- Generate 8-12 events spread across acts 1, 2, and 3\n` +
     `- Act 1 must have at least 2 events with unlockConditions: []\n` +
     `- category: "investigation"|"social"|"surprise"|"puzzle"|"deduction"\n` +
-    `- Social events must have dialogueSuspectId set to a valid suspect id\n` +
+    `- Social events must have dialogueSuspectId set to a valid suspect id; all OTHER categories must have dialogueSuspectId: null\n` +
+    `- Every suspect should have their own social event (one interview per suspect)\n` +
     `- Generate exactly ${puzzleCount[difficulty]} event(s) with category "puzzle"; these must have puzzleLabel set to a short kebab-case label (e.g. "desk-cipher"), NOT null\n` +
     `- Every puzzle event must have exactly 1 rewardsClueIds entry; that clue is the evidence unlocked by solving the puzzle\n` +
     `- All rewardsClueIds must be from the clue IDs list\n` +
     `- All dialogueSuspectId and unlocksSuspectIds values must be from the suspect IDs list\n` +
-    `- unlockConditions referenceId must exist in the clue IDs, suspect IDs, or other event IDs in this array\n` +
+    `- unlockConditions: type "event_completed" (referenceId = an event id in this array), "clue_found" (referenceId = a clue id), or "act_reached" (referenceId = "2" or "3")\n` +
+    `- An event may only depend on events or clues from the SAME or an EARLIER act — never a later one\n` +
+    `- Every act (1, 2 and 3) must contain at least one event with isMandatory: true; the act ends when all its mandatory events are done\n` +
     `- Do NOT create circular unlock conditions\n` +
     `- Key culprit clues (${clues.culpritClueIds.join(', ')}) should be rewards in Act 2-3 events\n` +
     `- Every event with category "investigation" MUST include an "examinationSpots" array with exactly 4-6 spots\n` +
     `- Each spot must have: "id" (kebab-case, unique within the event), "label" (2-4 words), "description" (1-2 atmospheric sentences, either a dead end or a clue reveal), "rewardsClueId" (a clue ID string OR null)\n` +
-    `- Investigation events: exactly 1-2 spots should have a non-null rewardsClueId; remaining spots are atmospheric dead ends\n` +
+    `- Investigation events: 1-3 spots should have a non-null rewardsClueId; remaining spots are atmospheric dead ends\n` +
+    `- Prefer awarding clues through investigation spots; social events should rarely award clues\n` +
     `- rewardsClueId values in spots must match the event's own rewardsClueIds array entries (one spot per rewarded clue)\n` +
     `- Social, puzzle, surprise, and deduction events must have examinationSpots: null\n` +
     `\nCRITICAL COVERAGE REQUIREMENT — the player must be able to discover everything by the end of Act 3:\n` +

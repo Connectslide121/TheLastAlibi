@@ -208,6 +208,17 @@ import { PuzzleEvent, Clue } from '../../models';
               Need a hint? ({{ puzzle().hints.length - shownHints().length }} remaining)
             </button>
           }
+          @if (!hasMoreHints() && !solved()) {
+            <button
+              type="button"
+              (click)="revealAnswer()"
+              class="self-start text-xs hover:underline transition-colors opacity-70 hover:opacity-100 cursor-pointer flex items-center gap-1"
+              style="color: rgb(252,165,165)"
+            >
+              <span class="material-icons mi-sm">visibility</span>
+              Stuck? Reveal the answer (−100 points)
+            </button>
+          }
         </div>
       }
     </div>
@@ -219,6 +230,8 @@ export class PuzzleFrameComponent {
   readonly rewardClue = input<Clue | null>(null);
   readonly previewOnly = input(false);
   readonly puzzleSolved = output<string>();
+  /** Fired when the player gives up and reveals the answer (scored as a penalty). */
+  readonly answerRevealed = output<void>();
 
   readonly solved = signal(false);
   readonly answer = signal('');
@@ -314,6 +327,13 @@ export class PuzzleFrameComponent {
     if (this.hasMoreHints()) {
       this.hintIndex.update((i) => i + 1);
     }
+  }
+
+  revealAnswer(): void {
+    if (this.solved()) return;
+    this.answer.set(this.displayAcceptableAnswers()[0] ?? '');
+    this.answerRevealed.emit();
+    this.markSolved();
   }
 
   private markSolved(): void {

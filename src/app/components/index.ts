@@ -4,7 +4,6 @@ export * from './suspect-card/suspect-card';
 export * from './interview-chat/interview-chat';
 export * from './location-card/location-card';
 export * from './timeline/timeline';
-export * from './dialogue-box/dialogue-box';
 export * from './puzzle-frame/puzzle-frame';
 export * from './toast/toast.service';
 export * from './toast/toast';

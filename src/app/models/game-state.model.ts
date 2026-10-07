@@ -25,6 +25,8 @@ export interface GameState {
   actionsCount: number;
   isAccusationUnlocked: boolean;
   hintsUsed: number;
+  /** Puzzles whose answer the player gave up on and revealed (absent on older saves). */
+  puzzleRevealsUsed?: number;
   finalAccusation?: FinalAccusation;
   evidenceBoardNotes: EvidenceBoardNote[];
   /** Keyed by card ID (suspect or clue) — persisted board layout */

@@ -7,11 +7,9 @@ import { ThemeService } from '../../services/theme.service';
 import { ImageService } from '../../services/image.service';
 import { InterviewService, InterviewChatMessage } from '../../services/interview.service';
 import { TtsService } from '../../services/tts.service';
-import { repairEventGraph } from '../../utils/event-graph-repair';
 import {
   SuspectCardComponent,
   ClueCardComponent,
-  DialogueBoxComponent,
   PuzzleFrameComponent,
   ActBannerComponent,
   DebugDashboardComponent,
@@ -27,7 +25,6 @@ import {
   Suspect,
   Clue,
   PuzzleEvent,
-  DialogueLine,
   Hint,
   Location as GameLocation,
 } from '../../models';
@@ -46,7 +43,6 @@ type CaseFileImageLightbox = {
   imports: [
     SuspectCardComponent,
     ClueCardComponent,
-    DialogueBoxComponent,
     PuzzleFrameComponent,
     ActBannerComponent,
     DebugDashboardComponent,
@@ -194,18 +190,6 @@ type CaseFileImageLightbox = {
             <div class="flex-1 flex items-center justify-center">
               <p class="text-(--color-text-muted) animate-pulse font-mono">Loading case…</p>
             </div>
-          } @else if (activeDialogueLines().length > 0) {
-            <!-- Dialogue Mode -->
-            <div class="mb-4">
-              <h2 class="font-heading text-xl text-(--color-accent) mb-1">
-                {{ selectedEvent()?.title }}
-              </h2>
-              <p class="text-sm text-(--color-text-muted)">{{ activeSuspect()?.name }}</p>
-            </div>
-            <app-dialogue-box
-              [lines]="activeDialogueLines()"
-              (dialogueClosed)="onDialogueClosed()"
-            />
           } @else if (activePuzzle()) {
             <!-- Puzzle Mode -->
             <div class="mb-4 shrink-0 flex items-center gap-3">
@@ -227,6 +211,7 @@ type CaseFileImageLightbox = {
               [puzzle]="activePuzzle()!"
               [rewardClue]="activePuzzleRewardClue()"
               (puzzleSolved)="onPuzzleSolved($event)"
+              (answerRevealed)="onPuzzleRevealed()"
             />
           } @else if (activeInterviewSuspect() && casePackage()) {
             <!-- Interview Chat Mode -->
@@ -236,6 +221,7 @@ type CaseFileImageLightbox = {
               [casePackage]="casePackage()!"
               [foundClues]="foundClues()"
               [sessionId]="gameState()?.sessionId ?? ''"
+              [eventId]="selectedEvent()?.id ?? ''"
               [revisitTranscript]="revisitInterviewTranscript()"
               (interviewClosed)="onInterviewClosed()"
             />
@@ -1533,13 +1519,13 @@ type CaseFileImageLightbox = {
                 >
                   Clues Found Here
                 </p>
-                @if (expandedLocation()!.cluesFoundHere.length === 0) {
+                @if (expandedLocationFoundClueIds().length === 0) {
                   <p class="text-sm italic" style="color: var(--color-text-muted)">
                     No logged clues at this location yet.
                   </p>
                 } @else {
                   <div class="flex flex-wrap gap-2">
-                    @for (clueId of expandedLocation()!.cluesFoundHere; track clueId) {
+                    @for (clueId of expandedLocationFoundClueIds(); track clueId) {
                       <span
                         class="px-2 py-1 rounded font-mono text-xs"
                         style="background: rgba(201,168,76,0.12); color: var(--color-text)"
@@ -1643,7 +1629,6 @@ export class InvestigationView implements OnInit {
   readonly isLoading = signal(true);
   readonly casePackage = signal<CasePackage | null>(null);
   readonly selectedEvent = signal<InvestigationEvent | null>(null);
-  readonly activeDialogueLines = signal<DialogueLine[]>([]);
   readonly activeInterviewSuspect = signal<Suspect | null>(null);
   readonly revisitInterviewTranscript = signal<InterviewChatMessage[] | null>(null);
   readonly showBriefingOverlay = signal(false);
@@ -1679,6 +1664,11 @@ export class InvestigationView implements OnInit {
     if (clueSpots.length === 0) return true;
     const examined = this.examinedSpotIds();
     return clueSpots.every((s) => examined.includes(s.id));
+  });
+  /** Only clues the player has actually found — listing the rest spoils them. */
+  readonly expandedLocationFoundClueIds = computed((): string[] => {
+    const found = new Set(this.gameState()?.foundClueIds ?? []);
+    return (this.expandedLocation()?.cluesFoundHere ?? []).filter((id) => found.has(id));
   });
   readonly sidebarOpen = signal(true);
   readonly activeHint = signal<Hint | null>(null);
@@ -1960,13 +1950,12 @@ export class InvestigationView implements OnInit {
         .loadDebugTrace(sessionId)
         .subscribe((trace) => this.debugTrace.loadSnapshot(trace));
 
-      // Retroactively repair any deadlocked event graph from older saves.
-      const repairedPkg: CasePackage = {
-        ...pkg,
-        eventGraph: repairEventGraph(pkg.eventGraph),
-      };
+      // loadCase() already ran the integrity pass (normalizeCasePackage), which
+      // also repairs older saves.
+      const repairedPkg: CasePackage = pkg;
 
       this.casePackage.set(repairedPkg);
+      if ((this.gsvc.state()?.completedEventIds.length ?? 0) > 0) this.checkActProgression();
       this.theme.applyTheme(repairedPkg.uiTheme);
       this.theme.applyTexture(repairedPkg.uiTheme.textureFamily);
       this.isLoading.set(false);
@@ -2007,8 +1996,6 @@ export class InvestigationView implements OnInit {
         this.revisitInterviewTranscript.set(null);
         this.activeInterviewSuspect.set(suspect);
       }
-    } else if (event.category !== 'puzzle') {
-      this.activeDialogueLines.set([]);
     }
   }
 
@@ -2022,35 +2009,32 @@ export class InvestigationView implements OnInit {
       const suspect = this.casePackage()?.suspects.find((s) => s.id === event.dialogueSuspectId);
       if (suspect) {
         const sessionId = this.gameState()?.sessionId ?? '';
-        const stored = this.interviewService.getStoredTranscript(sessionId, suspect.id);
+        const stored = this.interviewService.getStoredTranscript(sessionId, event.id, suspect.id);
         this.revisitInterviewTranscript.set(stored);
         this.activeInterviewSuspect.set(suspect);
-      } else {
-        this.activeDialogueLines.set([]);
       }
-      return;
     }
-
-    this.activeDialogueLines.set([]);
-  }
-
-  onDialogueClosed(): void {
-    const event = this.selectedEvent();
-    if (event && !this.isReplayingEvent(event.id)) this.completeCurrentEvent(event);
-    this.activeDialogueLines.set([]);
-    this.replayingEventId.set(null);
-    this.selectedEvent.set(null);
   }
 
   onInterviewClosed(): void {
     const event = this.selectedEvent();
-    if (event && !this.isReplayingEvent(event.id) && this.interviewService.allRequiredRevealed()) {
+    // The interview counts once the detective has asked anything at all. The
+    // alibi checkmark is a bonus, not a gate: gating on the model flagging it
+    // left mandatory interviews (and everything they unlock) stuck forever.
+    if (event && !this.isReplayingEvent(event.id) && this.interviewService.exchangeCount() > 0) {
+      if (this.interviewService.secrets().some((s) => s.key === 'contradiction' && s.revealed)) {
+        this.gsvc.markContradictionEvent(event.id);
+      }
       this.completeCurrentEvent(event);
     }
     this.activeInterviewSuspect.set(null);
     this.revisitInterviewTranscript.set(null);
     this.replayingEventId.set(null);
     this.selectedEvent.set(null);
+  }
+
+  onPuzzleRevealed(): void {
+    this.gsvc.revealPuzzleAnswer();
   }
 
   onPuzzleSolved(clueId: string): void {
@@ -2298,33 +2282,33 @@ export class InvestigationView implements OnInit {
     }
   }
 
+  /**
+   * Advances acts until the current one still has work blocking it. An act
+   * closes when all of its mandatory events are done — or when nothing in it is
+   * playable any more, so a broken or empty act can never trap the player.
+   */
   private checkActProgression(): void {
-    const pkg = this.casePackage();
-    const state = this.gsvc.state();
-    if (!pkg || !state) return;
+    for (let guard = 0; guard < 3; guard++) {
+      const pkg = this.casePackage();
+      const state = this.gsvc.state();
+      if (!pkg || !state) return;
 
-    const currentAct = state.currentAct;
+      const currentAct = state.currentAct;
 
-    if (currentAct === 3 && !state.isAccusationUnlocked) {
-      const act3Mandatory = pkg.eventGraph.filter((e) => e.act === 3 && e.isMandatory);
-      const completedCount = act3Mandatory.filter((e) =>
-        state.completedEventIds.includes(e.id),
-      ).length;
-      if (act3Mandatory.length === 0 || completedCount >= Math.ceil(act3Mandatory.length / 2)) {
-        this.gsvc.unlockAccusation();
+      if (currentAct === 3) {
+        if (!state.isAccusationUnlocked) this.gsvc.unlockAccusation();
+        return;
       }
-      return;
-    }
 
-    if (currentAct >= 3) return;
+      const mandatory = pkg.eventGraph.filter((e) => e.act === currentAct && e.isMandatory);
+      const mandatoryDone = mandatory.every((e) => state.completedEventIds.includes(e.id));
+      const nothingLeftThisAct = !this.gsvc
+        .getAvailableEvents(pkg, state)
+        .some((e) => e.act === currentAct);
+      if (!mandatoryDone && !nothingLeftThisAct) return;
 
-    const mandatory = pkg.eventGraph.filter((e) => e.act === currentAct && e.isMandatory);
-    const allDone =
-      mandatory.length > 0 && mandatory.every((e) => state.completedEventIds.includes(e.id));
-
-    if (allDone) {
       this.gsvc.advanceAct();
-      const newAct = (currentAct + 1) as 1 | 2 | 3;
+      const newAct = (currentAct + 1) as 2 | 3;
       this.currentActForBanner.set(newAct);
 
       const actSummaries: Record<number, string> = {
@@ -2339,10 +2323,6 @@ export class InvestigationView implements OnInit {
       this.actBannerTitle.set(actTitles[newAct] ?? `Act ${newAct}`);
       this.actBannerSummary.set(actSummaries[newAct] ?? '');
       this.showActBanner.set(true);
-
-      if (newAct === 3) {
-        this.gsvc.unlockAccusation();
-      }
     }
   }
 }

@@ -236,6 +236,17 @@ import { InterviewService, InterviewChatMessage } from '../../services/interview
         </div>
       }
 
+      <!-- ─── Everything disclosed (non-blocking) ─── -->
+      @if (allRevealed() && !pendingCompletion() && !isComplete() && !isReadOnly()) {
+        <div
+          class="shrink-0 px-4 py-2 flex items-center gap-2 text-xs font-mono"
+          style="border-top: 1px solid rgba(201,168,76,0.3); background: rgba(201,168,76,0.06); color: var(--color-text);"
+        >
+          <span class="material-icons mi-sm" style="color: var(--color-accent)">check_circle</span>
+          Every key disclosure is on record. Keep pressing, or press End when you're done.
+        </div>
+      }
+
       <!-- ─── Pending completion notice ─── -->
       @if (pendingCompletion() && !isComplete()) {
         <div
@@ -248,11 +259,7 @@ import { InterviewService, InterviewChatMessage } from '../../services/interview
             >check_circle</span
           >
           <p class="flex-1 text-xs font-mono leading-relaxed" style="color: var(--color-text);">
-            @if (allRequiredRevealed()) {
-              All key disclosures made — scroll up to review, then view the summary.
-            } @else {
-              Exchange limit reached — scroll up to review, then view the summary.
-            }
+            Exchange limit reached — scroll up to review, then view the summary.
           </p>
           <button
             type="button"
@@ -444,6 +451,8 @@ export class InterviewChatComponent implements OnInit, AfterViewChecked {
   readonly casePackage = input.required<CasePackage>();
   readonly foundClues = input.required<Clue[]>();
   readonly sessionId = input.required<string>();
+  /** Storage key for this interview's transcript (the event ID). */
+  readonly eventId = input<string>('');
   readonly revisitTranscript = input<InterviewChatMessage[] | null>(null);
   readonly interviewClosed = output<void>();
 
@@ -464,6 +473,7 @@ export class InterviewChatComponent implements OnInit, AfterViewChecked {
   readonly isComplete = this.service.isComplete;
   readonly pendingCompletion = this.service.pendingCompletion;
   readonly allRequiredRevealed = this.service.allRequiredRevealed;
+  readonly allRevealed = this.service.allRevealed;
   readonly exchangeCount = this.service.exchangeCount;
   readonly revealedCount = this.service.revealedCount;
   readonly totalCount = this.service.totalCount;
@@ -503,6 +513,7 @@ export class InterviewChatComponent implements OnInit, AfterViewChecked {
         this.casePackage(),
         this.foundClues(),
         this.sessionId(),
+        this.eventId() || this.suspect().id,
       );
     }
   }

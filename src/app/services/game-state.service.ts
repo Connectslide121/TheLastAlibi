@@ -199,6 +199,12 @@ export class GameStateService {
     return correct;
   }
 
+  revealPuzzleAnswer(): void {
+    this.mutate((s) => {
+      s.puzzleRevealsUsed = (s.puzzleRevealsUsed ?? 0) + 1;
+    });
+  }
+
   useHint(): void {
     this.mutate((s) => {
       s.hintsUsed++;

@@ -645,7 +645,12 @@ export class EvidenceBoardView implements OnInit {
         .flatMap((e) => e.rewardsClueIds),
     );
 
-    const suspects: BoardCard[] = state.unlockedSuspectIds
+    // Same visibility rule as the investigation and accusation views: anyone
+    // unlocked or already interviewed.
+    const visibleSuspectIds = [
+      ...new Set([...state.unlockedSuspectIds, ...state.interviewedSuspectIds]),
+    ];
+    const suspects: BoardCard[] = visibleSuspectIds
       .map((id) => pkg.suspects.find((s) => s.id === id))
       .filter((s): s is Suspect => !!s)
       .map((s, i) => {
@@ -657,7 +662,11 @@ export class EvidenceBoardView implements OnInit {
           sublabel: s.occupation,
           imageUrl: s.imageUrl,
           hasContradiction: state.contradictionEventIds.some((eid) =>
-            pkg.eventGraph.find((e) => e.id === eid && e.unlocksSuspectIds?.includes(s.id)),
+            pkg.eventGraph.find(
+              (e) =>
+                e.id === eid &&
+                (e.dialogueSuspectId === s.id || e.unlocksSuspectIds?.includes(s.id)),
+            ),
           ),
           x: pos.x,
           y: pos.y,

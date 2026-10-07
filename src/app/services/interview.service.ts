@@ -6,6 +6,8 @@ import { CasePackage, Suspect, Clue } from '../models';
 export interface InterviewChatMessage {
   role: 'detective' | 'suspect';
   text: string;
+  /** System placeholder shown when the model call failed — never sent back to the model. */
+  isError?: boolean;
 }
 
 export interface InterviewSecret {
@@ -18,7 +20,6 @@ export interface InterviewSecret {
 interface LlmInterviewPayload {
   response: string;
   revealedKeys: string[];
-  suggestedQuestions: string[];
 }
 
 @Injectable({ providedIn: 'root' })
@@ -42,16 +43,32 @@ export class InterviewService {
       .filter((s) => s.required)
       .every((s) => s.revealed),
   );
+  /** Nothing left to uncover — the detective may still keep talking. */
+  readonly allRevealed = computed(() => this.secrets().every((s) => s.revealed));
 
   private systemPrompt = '';
   private suspectName = '';
   private currentSessionId = '';
-  private currentSuspectId = '';
+  private transcriptKey = '';
+  private questionPool: string[] = [];
+  private askedQuestions = new Set<string>();
 
-  startSession(suspect: Suspect, pkg: CasePackage, foundClues: Clue[], sessionId: string): void {
+  /**
+   * @param transcriptKey identifies this interview for storage — the event ID,
+   *   so two interviews with the same suspect don't overwrite each other.
+   */
+  startSession(
+    suspect: Suspect,
+    pkg: CasePackage,
+    foundClues: Clue[],
+    sessionId: string,
+    transcriptKey: string = suspect.id,
+  ): void {
     this.suspectName = suspect.name;
     this.currentSessionId = sessionId;
-    this.currentSuspectId = suspect.id;
+    this.transcriptKey = transcriptKey;
+    this.askedQuestions = new Set();
+    this.questionPool = this.buildQuestionPool(suspect, pkg, foundClues);
     this.isComplete.set(false);
     this.pendingCompletion.set(false);
     this.exchangeCount.set(0);
@@ -84,21 +101,21 @@ export class InterviewService {
     // Opening line from the suspect (static, based on personality)
     this.chatHistory.set([{ role: 'suspect', text: this.buildOpeningLine(suspect) }]);
 
-    // Seed the suggested questions with sensible openers
-    this.suggestedQuestions.set([
-      'Where were you when the incident occurred? Can anyone vouch for you?',
-      'How well did you know the victim? Describe your relationship.',
-      "Is there anything about that day or evening you haven't told the authorities?",
-    ]);
+    this.refreshSuggestions();
   }
 
   sendMessage(text: string): Observable<void> {
+    if (this.exchangeCount() >= InterviewService.MAX_EXCHANGES || this.isLoading()) {
+      return new Observable<void>((o) => o.complete());
+    }
+    this.askedQuestions.add(text.trim());
     this.chatHistory.update((h) => [...h, { role: 'detective', text }]);
     this.isLoading.set(true);
     this.exchangeCount.update((c) => c + 1);
     const exchangeNum = this.exchangeCount();
 
     const conversationStr = this.chatHistory()
+      .filter((m) => !m.isError)
       .map((m) =>
         m.role === 'detective' ? `DETECTIVE: ${m.text}` : `${this.suspectName}: ${m.text}`,
       )
@@ -114,17 +131,13 @@ export class InterviewService {
         .generateText({
           systemPrompt: this.systemPrompt,
           prompt,
-          maxTokens: 500,
+          maxTokens: 600,
           temperature: 0.85,
         })
         .subscribe({
           next: (raw) => {
             const parsed = this.parseResponse(raw);
             this.chatHistory.update((h) => [...h, { role: 'suspect', text: parsed.response }]);
-
-            if (parsed.suggestedQuestions.length > 0) {
-              this.suggestedQuestions.set(parsed.suggestedQuestions.slice(0, 3));
-            }
 
             if (parsed.revealedKeys.length > 0) {
               this.secrets.update((ss) =>
@@ -133,6 +146,7 @@ export class InterviewService {
             }
 
             this.isLoading.set(false);
+            this.refreshSuggestions();
             this.checkCompletion(exchangeNum);
             observer.next();
             observer.complete();
@@ -141,7 +155,9 @@ export class InterviewService {
             const text = isQuotaError(err)
               ? "… (the suspect has gone quiet: today's free AI quota for this game has run out. It resets at midnight UTC.)"
               : '… (the suspect seems distracted and does not respond)';
-            this.chatHistory.update((h) => [...h, { role: 'suspect', text }]);
+            // A failed call doesn't use up one of the detective's exchanges.
+            this.chatHistory.update((h) => [...h, { role: 'suspect', text, isError: true }]);
+            this.exchangeCount.update((c) => Math.max(0, c - 1));
             this.isLoading.set(false);
             observer.next();
             observer.complete();
@@ -171,27 +187,30 @@ export class InterviewService {
     this.exchangeCount.set(0);
   }
 
-  getStoredTranscript(sessionId: string, suspectId: string): InterviewChatMessage[] | null {
-    try {
-      const key = `tla_interview_${sessionId}_${suspectId}`;
-      const raw = localStorage.getItem(key);
-      if (raw) return JSON.parse(raw) as InterviewChatMessage[];
-    } catch {
-      // ignore storage errors
+  /** Looks up by each key in turn (event ID first, then suspect ID for older saves). */
+  getStoredTranscript(sessionId: string, ...keys: string[]): InterviewChatMessage[] | null {
+    for (const k of keys) {
+      try {
+        const raw = localStorage.getItem(`tla_interview_${sessionId}_${k}`);
+        if (raw) return JSON.parse(raw) as InterviewChatMessage[];
+      } catch {
+        // ignore storage errors
+      }
     }
     return null;
   }
 
+  /** Only the exchange limit ends the conversation; disclosures never cut it short. */
   private checkCompletion(exchangeNum: number): void {
-    if (exchangeNum >= InterviewService.MAX_EXCHANGES || this.allRequiredRevealed()) {
+    if (exchangeNum >= InterviewService.MAX_EXCHANGES) {
       setTimeout(() => this.pendingCompletion.set(true), 1200);
     }
   }
 
   private saveTranscript(): void {
-    if (!this.currentSessionId || !this.currentSuspectId) return;
+    if (!this.currentSessionId || !this.transcriptKey) return;
     try {
-      const key = `tla_interview_${this.currentSessionId}_${this.currentSuspectId}`;
+      const key = `tla_interview_${this.currentSessionId}_${this.transcriptKey}`;
       localStorage.setItem(key, JSON.stringify(this.chatHistory()));
     } catch {
       // localStorage writes are non-fatal
@@ -220,13 +239,41 @@ export class InterviewService {
     return `Detective. I was told you had questions. I'll answer what I can, though I'm not sure I know anything useful.`;
   }
 
+  /**
+   * Suggested questions come from a neutral template, not from the model —
+   * the model playing the suspect knows who did it and would steer the player.
+   */
+  private buildQuestionPool(suspect: Suspect, pkg: CasePackage, foundClues: Clue[]): string[] {
+    const others = pkg.suspects.filter((s) => s.id !== suspect.id);
+    return [
+      'Where were you when it happened? Can anyone vouch for you?',
+      'How well did you know the victim?',
+      'Walk me through that day, from the start.',
+      ...foundClues.slice(-4).map((c) => `What can you tell me about the ${c.name.toLowerCase()}?`),
+      ...others.slice(0, 3).map((o) => `What do you make of ${o.name}?`),
+      'Did you see or hear anything unusual?',
+      "Is there anything you haven't told anyone yet?",
+      'Who do you think had a reason to do this?',
+    ];
+  }
+
+  private refreshSuggestions(): void {
+    const alibiPending = this.secrets().some((s) => s.key === 'alibi' && !s.revealed);
+    const pool = this.questionPool.filter((q) => !this.askedQuestions.has(q));
+    // Keep the whereabouts question on offer until the alibi is on record.
+    const ordered = alibiPending ? pool : pool.filter((q) => !q.startsWith('Where were you'));
+    this.suggestedQuestions.set(ordered.slice(0, 3));
+  }
+
   private buildSystemPrompt(suspect: Suspect, pkg: CasePackage, foundClues: Clue[]): string {
     const truth = pkg.truth;
     const isCulprit = truth.culpritId === suspect.id;
 
+    // Names and descriptions only — revealsInfo is the detective's deduction and
+    // would hand every suspect (including the culprit) the analysis.
     const foundCluesSummary =
       foundClues.length > 0
-        ? foundClues.map((c) => `- ${c.name}: ${c.revealsInfo}`).join('\n')
+        ? foundClues.map((c) => `- ${c.name}: ${c.description}`).join('\n')
         : 'None yet.';
 
     let situationBlock: string;
@@ -235,29 +282,49 @@ export class InterviewService {
         `You ARE the culprit. You committed this crime.\n` +
         `Your motive: "${truth.motive}".\n` +
         `Your method: "${truth.method}".\n` +
-        `You will not confess under any circumstances. You appear cooperative but are deeply anxious. ` +
-        `When pressed on contradictions, become visibly nervous, deflect, or change the subject. Never confirm your guilt directly.`;
+        `What really happened (never admit it): "${suspect.trueWhereabouts || truth.trueTimeline}".\n` +
+        `Your alibi below is a lie. Keep it consistent; when confronted with evidence that ` +
+        `contradicts it, get nervous, deflect, or offer a weak explanation — that is when you use ` +
+        `"contradiction" in revealedKeys. Never confess or confirm your guilt directly.`;
     } else if (suspect.isLying) {
       situationBlock =
-        `You are NOT the culprit, but you are lying about something related to the case.\n` +
-        `The key contradiction in your story: "${truth.keyContradiction}".\n` +
-        `Only admit this contradiction (use "contradiction" in revealedKeys) when the detective ` +
-        `directly confronts you or presents contradicting evidence. Do not volunteer it.`;
+        `You are NOT the culprit, but you are lying about something of your own: ` +
+        `"${suspect.lieAbout || 'you were not quite where you claim to have been, for embarrassing personal reasons'}".\n` +
+        (suspect.trueWhereabouts ? `What you really did: "${suspect.trueWhereabouts}".\n` : '') +
+        `Only admit the lie (use "contradiction" in revealedKeys) when the detective directly ` +
+        `confronts you or presents contradicting evidence. Do not volunteer it.`;
     } else if (suspect.isMistaken) {
       situationBlock =
-        `You are innocent, but one aspect of your account is factually wrong — ` +
-        `you genuinely believe what you're saying, even though part of it is mistaken.\n` +
-        `Your mistaken belief relates to: "${truth.keyContradiction}".`;
+        `You are innocent, but one detail of your account is wrong — you genuinely believe it.\n` +
+        `Your mistaken belief: "${suspect.mistakenBelief || 'you are slightly wrong about the time you saw someone'}".` +
+        (suspect.trueWhereabouts ? `\nWhat you really did: "${suspect.trueWhereabouts}".` : '');
     } else {
       situationBlock =
         `You are innocent and genuinely want to help the detective find the truth. ` +
-        `You may have your own worries, but you are not directly involved in the crime.`;
+        `You may have your own worries, but you are not involved in the crime.` +
+        (suspect.trueWhereabouts ? `\nWhat you did: "${suspect.trueWhereabouts}".` : '');
     }
 
     const hiddenBlock = suspect.isHidingSecret
       ? `\nPERSONAL SECRET (only disclose after DIRECT and persistent questioning): "${suspect.secretUnrelatedToCase}"\n` +
-        `Use "hidden_secret" in revealedKeys ONLY if the detective presses you on your personal life or explicitly corners you on this topic.`
+        `Use "hidden_secret" in revealedKeys ONLY in the reply where you actually admit this secret.`
       : '';
+
+    // Ground the suspect in the case so they don't invent people, times or facts.
+    const others = pkg.suspects
+      .filter((s) => s.id !== suspect.id)
+      .map((s) => `- ${s.name}, ${s.occupation} (${s.relationship})`)
+      .join('\n');
+    const timelineFacts = (pkg.timeline ?? [])
+      .filter((t) => t.isTrue && t.involvedSuspectIds.includes(suspect.id))
+      .map((t) => `- ${t.time}: ${t.description}`);
+    const facts = [...(suspect.knownFacts ?? []).map((f) => `- ${f}`), ...timelineFacts];
+    const voice = (suspect.interviewDialogue ?? [])
+      .map((l) => l.text)
+      .filter(Boolean)
+      .slice(0, 3)
+      .map((t) => `- "${t}"`)
+      .join('\n');
 
     const secretKeys = ['alibi'];
     if (suspect.isHidingSecret) secretKeys.push('hidden_secret');
@@ -270,69 +337,85 @@ export class InterviewService {
       `- Name: ${suspect.name}, age ${suspect.age}, ${suspect.occupation}\n` +
       `- Relationship to case: ${suspect.relationship}\n` +
       `- Appearance: ${suspect.description}\n` +
-      `- Personality: ${suspect.personality}\n\n` +
-      `CASE SETTING: ${pkg.metadata.setting}\n` +
+      `- Personality: ${suspect.personality}\n` +
+      (voice ? `- How you talk (examples):\n${voice}\n` : '') +
+      `\nCASE SETTING: ${pkg.metadata.setting}\n` +
       `CASE BACKGROUND: ${pkg.metadata.briefing}\n\n` +
+      `OTHER PEOPLE INVOLVED (the only other people you may name):\n${others || '- none'}\n\n` +
+      (facts.length ? `FACTS YOU KNOW (never contradict these):\n${facts.join('\n')}\n\n` : '') +
       `YOUR SITUATION:\n${situationBlock}\n` +
       hiddenBlock +
-      `\n\nYOUR ALIBI: "${suspect.alibi}"\n` +
-      `State this alibi (include "alibi" in revealedKeys) when asked directly about your whereabouts.\n\n` +
+      `\n\nYOUR ALIBI (what you tell people): "${suspect.alibi}"\n\n` +
       `EVIDENCE THE DETECTIVE CURRENTLY HAS:\n${foundCluesSummary}\n\n` +
       `RESPONSE FORMAT — respond ONLY with valid JSON, nothing before or after:\n` +
-      `{"response": "your 2–4 sentence in-character reply", "revealedKeys": [one or more of: ${secretKeys.map((k) => `"${k}"`).join(', ')}], "suggestedQuestions": ["follow-up 1", "follow-up 2", "follow-up 3"]}\n\n` +
-      `BEHAVIOR RULES:\n` +
+      `{"response": "your 2–4 sentence in-character reply", "revealedKeys": []}\n` +
+      `revealedKeys lists ZERO or more of ${secretKeys.map((k) => `"${k}"`).join(', ')} — ` +
+      `only for things you actually disclose IN THIS reply. Usually it is empty.\n` +
+      `- "alibi": you state where you were and what you were doing at the time of the crime\n` +
+      (suspect.isHidingSecret ? `- "hidden_secret": you admit your personal secret\n` : '') +
+      (suspect.isLying ? `- "contradiction": you are caught out in, or admit, your lie\n` : '') +
+      `\nBEHAVIOR RULES:\n` +
       `- Keep responses SHORT: 2–4 sentences. Never write monologues.\n` +
       `- Match your personality at all times: ${suspect.personality}\n` +
-      `- Be evasive about hidden things — deflect, show emotion, change subject, but don't bluntly lie\n` +
+      `- Never invent new people, places or times that contradict the facts above\n` +
+      `- Be evasive about hidden things — deflect, show emotion, change subject\n` +
       `- Occasionally turn a question back on the detective\n` +
-      `- suggestedQuestions: suggest 3 natural follow-up questions the detective might ask, nudging them toward important topics\n` +
       `- When near exchange ${InterviewService.MAX_EXCHANGES}, start naturally winding down the conversation`
     );
   }
 
   private parseResponse(raw: string): LlmInterviewPayload {
-    const cleaned = raw.trim().replace(/<think>[\s\S]*?<\/think>\s*/gi, '');
+    const cleaned = String(raw ?? '')
+      .trim()
+      .replace(/<think>[\s\S]*?<\/think>\s*/gi, '')
+      .replace(/^```(?:json)?\s*/i, '')
+      .replace(/\s*```\s*$/, '')
+      .trim();
 
-    // Attempt 1: direct JSON parse
-    try {
-      const p = JSON.parse(cleaned) as LlmInterviewPayload;
-      if (typeof p.response === 'string') {
-        return {
-          response: p.response,
-          revealedKeys: Array.isArray(p.revealedKeys) ? (p.revealedKeys as string[]) : [],
-          suggestedQuestions: Array.isArray(p.suggestedQuestions)
-            ? (p.suggestedQuestions as string[])
-            : [],
-        };
-      }
-    } catch {
-      // fall through to extraction
-    }
-
-    // Attempt 2: find the first JSON-like object containing a "response" key
-    const jsonMatch = cleaned.match(/\{[\s\S]*?"response"\s*:\s*"[\s\S]*?"[\s\S]*?\}/);
-    if (jsonMatch) {
-      try {
-        const p = JSON.parse(jsonMatch[0]) as LlmInterviewPayload;
-        if (typeof p.response === 'string') {
-          return {
-            response: p.response,
-            revealedKeys: Array.isArray(p.revealedKeys) ? (p.revealedKeys as string[]) : [],
-            suggestedQuestions: Array.isArray(p.suggestedQuestions)
-              ? (p.suggestedQuestions as string[])
-              : [],
-          };
-        }
-      } catch {
-        // fall through to fallback
-      }
-    }
-
-    // Fallback: treat the entire raw text as the spoken response
-    return {
-      response: cleaned.length > 0 ? cleaned : '… (the suspect says nothing)',
-      revealedKeys: [],
-      suggestedQuestions: [],
+    const fromObject = (p: unknown): LlmInterviewPayload | null => {
+      const o = p as Partial<LlmInterviewPayload> | null;
+      if (!o || typeof o.response !== 'string' || !o.response.trim()) return null;
+      return {
+        response: o.response.trim(),
+        revealedKeys: Array.isArray(o.revealedKeys)
+          ? o.revealedKeys.filter((k): k is string => typeof k === 'string')
+          : [],
+      };
     };
+    const tryParse = (text: string): LlmInterviewPayload | null => {
+      try {
+        return fromObject(JSON.parse(text));
+      } catch {
+        return null;
+      }
+    };
+
+    // 1. The whole reply, then the outermost {...} span (survives nested braces).
+    const first = cleaned.indexOf('{');
+    const last = cleaned.lastIndexOf('}');
+    const parsed =
+      tryParse(cleaned) ??
+      (first !== -1 && last > first ? tryParse(cleaned.slice(first, last + 1)) : null);
+    if (parsed) return parsed;
+
+    // 2. Truncated or malformed JSON: salvage the "response" string by hand.
+    const m = cleaned.match(/"response"\s*:\s*"((?:[^"\\]|\\.)*)/);
+    if (m) {
+      let text = m[1];
+      try {
+        text = JSON.parse(`"${text.replace(/\\$/, '')}"`) as string;
+      } catch {
+        text = text.replace(/\\"/g, '"').replace(/\\n/g, ' ');
+      }
+      const keys = cleaned.match(/"revealedKeys"\s*:\s*\[([^\]]*)\]/)?.[1] ?? '';
+      return {
+        response: text.trim() || '…',
+        revealedKeys: [...keys.matchAll(/"([a-z_]+)"/g)].map((k) => k[1]),
+      };
+    }
+
+    // 3. Plain prose is fine, but never show raw JSON scaffolding to the player.
+    if (cleaned && !cleaned.startsWith('{')) return { response: cleaned, revealedKeys: [] };
+    return { response: '… (the suspect hesitates and says nothing)', revealedKeys: [] };
   }
 }

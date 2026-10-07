@@ -2,6 +2,13 @@
 
 > **Internal architecture document.** Describes the redesigned case-generation pipeline, staged JSON generation, and backend validation between steps.
 
+> **Implementation status.** The staged pipeline is implemented (`llm.service.ts`, prompts in `llm-prompts.ts`). The per-step "backend validation" blocks below are design intent; what actually runs is:
+>
+> - **After Step 2:** `culpritSuspectId` is snapped to a real suspect (ID fuzzy match, then `culpritLabel`).
+> - **After Step 6:** event reward IDs are snapped to real clue IDs before puzzle concepts use them.
+> - **Step 7:** puzzle concepts are checked by `validatePuzzleConcept` and retried up to twice.
+> - **Step 10:** `ensureCaseIntegrity` (`src/app/utils/case-integrity.ts`). It runs at assembly and on every load, and it repairs the case deterministically instead of sending repair prompts. See Step 10 below.
+
 ---
 
 ## Table of Contents
@@ -513,6 +520,28 @@ The old approach asked a single model call to produce ~800–2000 tokens of stru
 **Purpose:** This is not an AI step — it is a pure backend pass. The backend assembles all partial outputs, runs the full cross-reference validation logic, and either confirms success or triggers targeted repair prompts for specific failed fields. See Section 5 for full validation and repair logic.
 
 If targeted repair is needed, the backend generates a small repair prompt for only the broken fragment and sends it back to the model. This counts as a separate mini-call, not a full regeneration.
+
+**As implemented** (`ensureCaseIntegrity`, called from `normalizeCasePackage` at assembly and whenever `CaseStoreService.loadCase` runs). It makes no model calls and is idempotent:
+
+1. **Canonicalize.**
+   - Dedupes suspect, clue, location and event IDs.
+   - Snaps every reference to the closest real ID, or drops it. This covers rewards, unlocks, `dialogueSuspectId`, unlock conditions, spot rewards, the truth layer, the puzzle `rewardedClueId` and timeline suspects.
+   - Coerces `act` to 1–3 and `act_reached` to `"1"`–`"3"`.
+   - Only `social` events keep a `dialogueSuspectId`; on other events it becomes an unlock.
+   - Spot rewards are always also event rewards, and the culprit always has `isLying`.
+2. **Simulate.** `simulatePlaythrough` plays the graph the way the runtime gates it: act by act, with unlock conditions, where each act completes everything playable before advancing.
+3. **Repair.**
+   - Strips unlock conditions that keep an event from ever being playable, or keep a mandatory event from being playable within its own act.
+   - Adds an interview for each suspect who has none.
+   - Places orphan clues in "Revisit: <location>" investigation scenes with their own examination spots. Culprit clues go in act 2.
+   - Unlocks any suspect not met by act 2 from a mandatory act-2 event, because the accusation opens on entering act 3.
+   - Makes sure every act that has events has at least one mandatory event.
+
+Runtime backstops in `InvestigationView`:
+
+- An act also closes when nothing in it is left to play.
+- An interview completes on close once at least one question was asked.
+- A puzzle can be revealed after its last hint, for −100 points.
 
 **Mandatory:** Yes
 
