@@ -78,13 +78,23 @@ export class WorkerLlmService {
         throw new Error(message);
       }
 
-      if (typeof parsed.text !== 'string' || parsed.text.trim().length === 0) {
+      // Workers AI hands JSON output back already parsed for some models, so
+      // `text` can arrive as an object or array. Everything downstream parses
+      // the raw JSON string itself, so give it that string back.
+      const text =
+        typeof parsed.text === 'string'
+          ? parsed.text
+          : parsed.text !== null && typeof parsed.text === 'object'
+            ? JSON.stringify(parsed.text)
+            : '';
+
+      if (text.trim().length === 0) {
         const message = `Worker ${path} response did not include a valid text field`;
         this.debug.finishAiRequestError(requestId, message, bodyText);
         throw new Error(message);
       }
 
-      const responseText = parsed.text.trim().replace(/<think>[\s\S]*?<\/think>\s*/gi, '');
+      const responseText = text.trim().replace(/<think>[\s\S]*?<\/think>\s*/gi, '');
       this.debug.finishAiRequestSuccess(requestId, bodyText, responseText);
       return responseText;
     } catch (error) {
