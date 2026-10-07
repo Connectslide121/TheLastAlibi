@@ -97,11 +97,9 @@ body {
 }
 
 /* Textures are relative so the build bundles them and they resolve under any
-   base href (the site is served from /TheLastAlibi/ on GitHub Pages).
-   paper.png is not in src/assets/textures yet, so it keeps its absolute path:
-   a relative URL to a missing file would fail the build. */
+   base href (the site is served from /TheLastAlibi/ on GitHub Pages). */
 [data-texture='paper']::before {
-  background-image: url('/assets/textures/paper.png');
+  background-image: url('./assets/textures/paper.png');
 }
 [data-texture='cork']::before {
   background-image: url('./assets/textures/cork.png');

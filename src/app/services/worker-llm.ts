@@ -12,6 +12,27 @@ export interface WorkerGenerationOptions {
   debugMeta?: DebugRequestMeta;
 }
 
+/**
+ * The Worker runs on Cloudflare's free Workers AI tier, which allows a fixed
+ * number of "neurons" per day and answers with error 4006 once they are spent.
+ * Retrying cannot help until the allowance resets at 00:00 UTC, so this gets
+ * its own error type: callers stop retrying and tell the player plainly.
+ */
+export class WorkerQuotaError extends Error {
+  override readonly name = 'WorkerQuotaError';
+  constructor() {
+    super("Today's free AI quota for this game has run out. It resets at midnight UTC.");
+  }
+}
+
+/** True for a quota error, even after another layer has wrapped its message. */
+export function isQuotaError(error: unknown): boolean {
+  return (
+    error instanceof WorkerQuotaError ||
+    (error instanceof Error && /free AI quota|\b4006\b|daily free allocation/i.test(error.message))
+  );
+}
+
 interface WorkerTextResponse {
   text?: unknown;
   raw?: unknown;
@@ -66,6 +87,7 @@ export class WorkerLlmService {
       if (!response.ok) {
         const message = `Worker ${path} failed with status ${response.status}${bodyText ? `: ${bodyText}` : ''}`;
         this.debug.finishAiRequestError(requestId, message, bodyText);
+        if (/\b4006\b|daily free allocation/i.test(bodyText)) throw new WorkerQuotaError();
         throw new Error(message);
       }
 

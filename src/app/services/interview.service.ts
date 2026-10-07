@@ -1,6 +1,6 @@
 import { Injectable, inject, signal, computed } from '@angular/core';
 import { Observable } from 'rxjs';
-import { WorkerLlmService } from './worker-llm';
+import { WorkerLlmService, isQuotaError } from './worker-llm';
 import { CasePackage, Suspect, Clue } from '../models';
 
 export interface InterviewChatMessage {
@@ -137,11 +137,11 @@ export class InterviewService {
             observer.next();
             observer.complete();
           },
-          error: () => {
-            this.chatHistory.update((h) => [
-              ...h,
-              { role: 'suspect', text: '… (the suspect seems distracted and does not respond)' },
-            ]);
+          error: (err: unknown) => {
+            const text = isQuotaError(err)
+              ? "… (the suspect has gone quiet: today's free AI quota for this game has run out. It resets at midnight UTC.)"
+              : '… (the suspect seems distracted and does not respond)';
+            this.chatHistory.update((h) => [...h, { role: 'suspect', text }]);
             this.isLoading.set(false);
             observer.next();
             observer.complete();

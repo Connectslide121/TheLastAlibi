@@ -13,7 +13,7 @@ import {
   TimelineEvent,
 } from '../models';
 import { DebugRequestMeta } from './debug-trace.service';
-import { WorkerLlmService } from './worker-llm';
+import { WorkerLlmService, isQuotaError } from './worker-llm';
 import { repairEventGraph } from '../utils/event-graph-repair';
 import { normalizeCasePackage } from '../utils/normalize-case-package';
 import { validatePuzzleConcept } from '../utils/puzzle-concept-validation';
@@ -528,6 +528,8 @@ export class LlmService {
   private callText(prompt: string, options: LlmCallOptions = {}, attempt = 0): Observable<string> {
     return this.workerLlm.generateText({ prompt, ...options }).pipe(
       catchError((err: Error) => {
+        // An exhausted daily quota will not recover on a retry.
+        if (isQuotaError(err)) return throwError(() => err);
         if (attempt < 2) return this.callText(prompt, options, attempt + 1);
         return throwError(
           () => new Error(`LLM text call failed after ${attempt + 1} attempts: ${err.message}`),
@@ -543,6 +545,7 @@ export class LlmService {
   ): Observable<string> {
     return this.workerLlm.generatePuzzle({ prompt, ...options }).pipe(
       catchError((err: Error) => {
+        if (isQuotaError(err)) return throwError(() => err);
         if (attempt < 2) return this.callPuzzle(prompt, options, attempt + 1);
         return throwError(
           () => new Error(`LLM puzzle call failed after ${attempt + 1} attempts: ${err.message}`),

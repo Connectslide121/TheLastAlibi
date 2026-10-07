@@ -2,6 +2,7 @@ import { Component, OnInit, signal, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { DebugTraceService } from '../../services/debug-trace.service';
 import { LlmService } from '../../services/llm.service';
+import { isQuotaError } from '../../services/worker-llm';
 import { ImageService } from '../../services/image.service';
 import { GameStateService } from '../../services/game-state.service';
 import { CaseStoreService } from '../../services/case-store.service';
@@ -166,7 +167,9 @@ export class GenerateView implements OnInit {
       },
       error: (err: Error) => {
         this.error.set(
-          `Failed to generate case: ${err.message}. Check your API key and try again.`,
+          isQuotaError(err)
+            ? "The agency is closed for today: this game's free AI quota has run out. It resets at midnight UTC, so please come back tomorrow."
+            : `Failed to generate case: ${err.message}. Please try again.`,
         );
         this.phase.set('error');
       },
