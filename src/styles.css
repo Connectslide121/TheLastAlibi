@@ -96,23 +96,27 @@ body {
   background-size: 256px 256px;
 }
 
+/* Textures are relative so the build bundles them and they resolve under any
+   base href (the site is served from /TheLastAlibi/ on GitHub Pages).
+   paper.png is not in src/assets/textures yet, so it keeps its absolute path:
+   a relative URL to a missing file would fail the build. */
 [data-texture='paper']::before {
   background-image: url('/assets/textures/paper.png');
 }
 [data-texture='cork']::before {
-  background-image: url('/assets/textures/cork.png');
+  background-image: url('./assets/textures/cork.png');
 }
 [data-texture='grain']::before {
-  background-image: url('/assets/textures/grain.png');
+  background-image: url('./assets/textures/grain.png');
 }
 [data-texture='metal']::before {
-  background-image: url('/assets/textures/metal.png');
+  background-image: url('./assets/textures/metal.png');
 }
 [data-texture='leather']::before {
-  background-image: url('/assets/textures/leather.png');
+  background-image: url('./assets/textures/leather.png');
 }
 [data-texture='fabric']::before {
-  background-image: url('/assets/textures/fabric.png');
+  background-image: url('./assets/textures/fabric.png');
 }
 /* pixel_noise — inline SVG feTurbulence, no external asset needed */
 [data-texture='pixel_noise']::before {
