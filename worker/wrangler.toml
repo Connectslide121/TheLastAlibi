@@ -1,0 +1,10 @@
+# Cloudflare Worker behind The Last Alibi: every AI call the game makes goes
+# through it (https://thelastalibi.jonmendi.workers.dev). Deploy with
+# `npm run deploy` from this folder after a one-time `npx wrangler login`.
+name = "thelastalibi"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+
+# Workers AI, as env.AI
+[ai]
+binding = "AI"

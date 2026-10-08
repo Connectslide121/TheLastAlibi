@@ -3,6 +3,9 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches: [master]
+    # The Cloudflare Worker deploys separately (worker/, `npm run deploy`).
+    paths-ignore:
+      - 'worker/**'
   workflow_dispatch:
 
 permissions:
