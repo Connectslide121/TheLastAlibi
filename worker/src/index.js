@@ -3,7 +3,7 @@
 //   POST /text    { prompt, systemPrompt?, maxTokens?, temperature?, task?, json? }
 //   POST /puzzle  same body; puzzles are HTML, written by the case-generation chain
 //   POST /image   { prompt, width?, height?, seed? }  -> image bytes
-//   POST /tts     { text, speaker?, encoding? }        -> audio/mpeg
+//   POST /tts     { text, speaker?, encoding? }        -> audio/mpeg (game falls back to the browser's voice)
 //
 // Text and image jobs are routed across several providers' free tiers (see
 // providers.js and the chains in wrangler.toml). `task` picks the chain:
@@ -14,7 +14,7 @@
 // Responses carry X-AI-Provider / X-AI-Model saying who answered; the JSON
 // body's `raw.attempts` lists every provider tried, for the game's Debug panel.
 
-import { parseChain, runImage, runText } from "./providers.js";
+import { parseChain, runImage, runSpeech, runText } from "./providers.js";
 
 // Used when wrangler.toml does not set a chain.
 const DEFAULT_CHAINS = {
@@ -22,6 +22,7 @@ const DEFAULT_CHAINS = {
   TEXT_CHAT_CHAIN: "workers-ai:@cf/meta/llama-3.1-8b-instruct-fast",
   TEXT_UTILITY_CHAIN: "workers-ai:@cf/meta/llama-3.1-8b-instruct-fast",
   IMAGE_CHAIN: "workers-ai:@cf/black-forest-labs/flux-2-klein-9b",
+  SPEECH_CHAIN: "workers-ai:@cf/deepgram/aura-2-en",
 };
 
 const TASK_CHAINS = { case: "TEXT_CASE_CHAIN", chat: "TEXT_CHAT_CHAIN", utility: "TEXT_UTILITY_CHAIN" };
@@ -142,11 +143,18 @@ async function handleTts(request, env, corsHeaders) {
     return jsonResponse({ error: "Missing text" }, 400, corsHeaders);
   }
 
-  const audioStream = await env.AI.run("@cf/deepgram/aura-2-en", { text, speaker, encoding });
+  const result = await runSpeech(env, chainFor(env, "SPEECH_CHAIN"), { text, speaker, encoding });
+  if (!result.ok) return exhaustedResponse(result, corsHeaders);
 
-  return new Response(audioStream, {
+  return new Response(result.bytes, {
     status: 200,
-    headers: { ...corsHeaders, "Content-Type": "audio/mpeg", "Cache-Control": "no-store" },
+    headers: {
+      ...corsHeaders,
+      "Content-Type": result.type,
+      "Cache-Control": "no-store",
+      "X-AI-Provider": result.provider,
+      "X-AI-Model": result.model,
+    },
   });
 }
 

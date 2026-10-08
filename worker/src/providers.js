@@ -7,6 +7,7 @@
 //   TEXT_CHAT_CHAIN    suspect interviews: fast models
 //   TEXT_UTILITY_CHAIN small jobs (rewriting image prompts)
 //   IMAGE_CHAIN        images, on providers that do nothing else
+//   SPEECH_CHAIN       narration
 //
 // The first entry that answers wins. An entry is skipped when its provider has
 // no API key configured, or when it ran out of quota recently (remembered until
@@ -265,7 +266,8 @@ async function workersAiImage(env, model, { prompt, width, height, seed }) {
   }
 }
 
-export async function runImage(env, chain, req) {
+/** Run a media job (image, speech) down its chain; `call` does one entry. */
+async function runMedia(env, chain, req, call) {
   const attempts = [];
   for (const { provider, model } of chain) {
     const key = `${provider}:${model}`;
@@ -279,12 +281,7 @@ export async function runImage(env, chain, req) {
     }
     let result;
     try {
-      result =
-        provider === "pollinations"
-          ? await pollinationsImage(env, model, req)
-          : provider === "workers-ai"
-            ? await workersAiImage(env, model, req)
-            : { ok: false, status: 0, body: `unknown image provider ${provider}` };
+      result = await call(provider, model, req);
     } catch (err) {
       result = { ok: false, status: 0, body: err instanceof Error ? err.message : String(err) };
     }
@@ -298,6 +295,53 @@ export async function runImage(env, chain, req) {
   }
   const quota = attempts.length > 0 && attempts.every((a) => a.skipped || a.status === 429 || a.status === 402);
   return { ok: false, quota, attempts };
+}
+
+export function runImage(env, chain, req) {
+  return runMedia(env, chain, req, (provider, model, r) =>
+    provider === "pollinations"
+      ? pollinationsImage(env, model, r)
+      : provider === "workers-ai"
+        ? workersAiImage(env, model, r)
+        : { ok: false, status: 0, body: `unknown image provider ${provider}` },
+  );
+}
+
+// --- speech ------------------------------------------------------------------
+
+/** Deepgram Aura speakers -> the nearest OpenAI voice (the game uses "zeus"). */
+const OPENAI_VOICE = { zeus: "onyx", orion: "onyx", arcas: "echo", orpheus: "fable", athena: "nova", luna: "shimmer", asteria: "alloy" };
+
+async function workersAiSpeech(env, model, { text, speaker, encoding }) {
+  try {
+    const audio = await env.AI.run(model, { text, speaker, encoding });
+    return { ok: true, bytes: audio, type: "audio/mpeg" };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { ok: false, status: /4006|daily free allocation/i.test(message) ? 429 : 500, body: message };
+  }
+}
+
+async function pollinationsSpeech(env, model, { text, speaker }) {
+  const res = await fetch("https://gen.pollinations.ai/v1/audio/speech", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${env.POLLINATIONS_API_KEY}` },
+    body: JSON.stringify({ model, input: text, voice: OPENAI_VOICE[speaker] || "onyx", response_format: "mp3" }),
+  });
+  if (!res.ok) {
+    return { ok: false, status: res.status, body: await res.text().catch(() => ""), retryAfter: res.headers.get("retry-after") };
+  }
+  return { ok: true, bytes: new Uint8Array(await res.arrayBuffer()), type: "audio/mpeg" };
+}
+
+export function runSpeech(env, chain, req) {
+  return runMedia(env, chain, req, (provider, model, r) =>
+    provider === "workers-ai"
+      ? workersAiSpeech(env, model, r)
+      : provider === "pollinations"
+        ? pollinationsSpeech(env, model, r)
+        : { ok: false, status: 0, body: `unknown speech provider ${provider}` },
+  );
 }
 
 /** Test hook: forget every remembered quota window. */

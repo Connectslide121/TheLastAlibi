@@ -159,3 +159,16 @@ test("quota windows: stated waits win, daily wording means midnight UTC", () => 
   assert.equal(quotaWindow(402, "out of pollen"), midnight);
   assert.equal(quotaWindow(500, "internal error"), 0);
 });
+
+test("narration uses Workers AI, then Pollinations with the matching voice", async () => {
+  const calls = mockFetch({
+    "gen.pollinations.ai": [() => new Response(new Uint8Array([9]), { headers: { "content-type": "audio/mpeg" } })],
+  });
+  const speech = { ...VARS, SPEECH_CHAIN: "workers-ai:@cf/aura, pollinations:openai/tts-1" };
+  const ok = await worker.fetch(post("/tts", { text: "Act I." }), env({ ...speech, AI: { run: async () => new Uint8Array([7]) } }));
+  assert.equal(ok.headers.get("X-AI-Provider"), "workers-ai");
+  const out = { run: async () => { throw new Error("4006: you have used up your daily free allocation"); } };
+  const fallback = await worker.fetch(post("/tts", { text: "Act II.", speaker: "zeus" }), env({ ...speech, AI: out }));
+  assert.equal(fallback.headers.get("X-AI-Provider"), "pollinations");
+  assert.equal(calls[0].body.voice, "onyx");
+});

@@ -25,3 +25,7 @@ TEXT_UTILITY_CHAIN = "gemini:gemini-2.5-flash-lite, workers-ai:@cf/meta/llama-3.
 # Images: Pollinations only does images here, so they never draw on the text
 # providers. Workers AI is the reserve.
 IMAGE_CHAIN = "pollinations:black-forest-labs/flux.2-klein-4b, workers-ai:@cf/black-forest-labs/flux-2-klein-9b"
+# Narration: Cloudflare's free daily allowance first (with text and images
+# elsewhere, it is left almost entirely for speech), Pollinations as reserve.
+# When both are out, the game reads it with the browser's own voice.
+SPEECH_CHAIN = "workers-ai:@cf/deepgram/aura-2-en, pollinations:openai/tts-1"
