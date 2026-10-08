@@ -1,4 +1,13 @@
-﻿import { Component, OnInit, signal, computed, effect, inject, untracked } from '@angular/core';
+﻿import {
+  Component,
+  OnInit,
+  signal,
+  computed,
+  effect,
+  inject,
+  isDevMode,
+  untracked,
+} from '@angular/core';
 import { Router } from '@angular/router';
 import { CaseStoreService } from '../../services/case-store.service';
 import { DebugTraceService } from '../../services/debug-trace.service';
@@ -75,26 +84,29 @@ type CaseFileImageLightbox = {
         >
           <span class="material-icons mi-sm">home</span>
         </button>
-        <button
-          type="button"
-          (click)="debugDashboardOpen.set(true)"
-          class="px-3 py-1.5 text-xs font-mono uppercase tracking-widest rounded cursor-pointer border hover:opacity-80 transition-opacity flex items-center gap-1"
-          style="border-color: rgba(255,255,255,0.2); color: var(--color-text-muted)"
-          title="Open debug dashboard"
-        >
-          <span class="material-icons mi-sm">bug_report</span>
-          Debug
-        </button>
-        <button
-          type="button"
-          (click)="styleConfigOpen.set(true)"
-          class="px-3 py-1.5 text-xs font-mono uppercase tracking-widest rounded cursor-pointer border hover:opacity-80 transition-opacity flex items-center gap-1"
-          style="border-color: rgba(255,255,255,0.2); color: var(--color-text-muted)"
-          title="Customize styles"
-        >
-          <span class="material-icons mi-sm">palette</span>
-          Styles
-        </button>
+        <!-- Development tools: in ng serve, or on any build with ?debug in the URL -->
+        @if (devTools) {
+          <button
+            type="button"
+            (click)="debugDashboardOpen.set(true)"
+            class="px-3 py-1.5 text-xs font-mono uppercase tracking-widest rounded cursor-pointer border hover:opacity-80 transition-opacity flex items-center gap-1"
+            style="border-color: rgba(255,255,255,0.2); color: var(--color-text-muted)"
+            title="Open debug dashboard"
+          >
+            <span class="material-icons mi-sm">bug_report</span>
+            Debug
+          </button>
+          <button
+            type="button"
+            (click)="styleConfigOpen.set(true)"
+            class="px-3 py-1.5 text-xs font-mono uppercase tracking-widest rounded cursor-pointer border hover:opacity-80 transition-opacity flex items-center gap-1"
+            style="border-color: rgba(255,255,255,0.2); color: var(--color-text-muted)"
+            title="Customize styles"
+          >
+            <span class="material-icons mi-sm">palette</span>
+            Styles
+          </button>
+        }
         <h1 class="font-heading text-lg text-(--color-accent) truncate flex-1">
           {{ casePackage()?.metadata?.title ?? 'The Last Alibi' }}
         </h1>
@@ -1625,6 +1637,9 @@ export class InvestigationView implements OnInit {
   private readonly imageService = inject(ImageService);
   private readonly interviewService = inject(InterviewService);
   readonly ttsService = inject(TtsService);
+
+  /** Debug and Styles buttons: development only, or `?debug` on the live site. */
+  readonly devTools = isDevMode() || new URLSearchParams(location.search).has('debug');
 
   readonly isLoading = signal(true);
   readonly casePackage = signal<CasePackage | null>(null);
