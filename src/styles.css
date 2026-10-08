@@ -134,7 +134,11 @@ app-evidence-board-view,
 app-accusation-view,
 app-reveal-view {
   display: block;
-  animation: routeFadeIn 0.35s ease-out both;
+  /* backwards, not both: a transform left on the view after the fade (even
+     translateY(0)) makes it the containing block of every position: fixed
+     modal inside it, so they centred on the whole page instead of the
+     window. */
+  animation: routeFadeIn 0.35s ease-out backwards;
 }
 
 @keyframes routeFadeIn {
