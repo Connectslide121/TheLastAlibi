@@ -3,7 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { CaseStoreService } from '../../services/case-store.service';
 import { GameStateService } from '../../services/game-state.service';
-import { ImageService } from '../../services/image.service';
+import { ImageService, imagesReached } from '../../services/image.service';
 import {
   CasePackage,
   Suspect,
@@ -753,8 +753,9 @@ export class EvidenceBoardView implements OnInit {
     this.caseStore.loadCase(sessionId).subscribe((pkg) => {
       if (pkg) {
         this.casePackage.set(pkg);
-        // Re-hydrate blob URLs from IndexedDB image cache (they don't survive page refresh)
-        this.imageService.generateAllCaseImages(pkg).subscribe({
+        // Re-hydrate blob URLs from IndexedDB image cache (they don't survive page refresh),
+        // and make any image the player has reached but not seen yet.
+        this.imageService.generateAllCaseImages(pkg, imagesReached(this.gsvc.state())).subscribe({
           next: (updated) => this.casePackage.set(updated),
         });
       }

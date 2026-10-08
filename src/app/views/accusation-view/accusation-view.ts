@@ -3,7 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { CaseStoreService } from '../../services/case-store.service';
 import { GameStateService } from '../../services/game-state.service';
-import { ImageService } from '../../services/image.service';
+import { ImageService, imagesReached } from '../../services/image.service';
 import { CasePackage, Suspect, Clue, FinalAccusation } from '../../models';
 
 @Component({
@@ -268,9 +268,13 @@ export class AccusationView implements OnInit {
       this.isLoading.set(false);
 
       // Re-hydrate blob URLs from IndexedDB so portrait choices render after navigation or refresh.
-      this.imageService.generateAllCaseImages(pkg).subscribe({
-        next: (updated) => this.casePackage.set(updated),
-      });
+      // Every suspect is a choice here, so all their portraits are wanted.
+      const reached = imagesReached(this.gsvc.state());
+      this.imageService
+        .generateAllCaseImages(pkg, (type, id) => type === 'suspect' || reached(type, id))
+        .subscribe({
+          next: (updated) => this.casePackage.set(updated),
+        });
     });
   }
 

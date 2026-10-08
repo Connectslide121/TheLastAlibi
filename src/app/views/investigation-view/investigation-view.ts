@@ -1,10 +1,10 @@
-﻿import { Component, OnInit, signal, computed, inject } from '@angular/core';
+﻿import { Component, OnInit, signal, computed, effect, inject, untracked } from '@angular/core';
 import { Router } from '@angular/router';
 import { CaseStoreService } from '../../services/case-store.service';
 import { DebugTraceService } from '../../services/debug-trace.service';
 import { GameStateService } from '../../services/game-state.service';
 import { ThemeService } from '../../services/theme.service';
-import { ImageService } from '../../services/image.service';
+import { ImageService, imagesReached } from '../../services/image.service';
 import { InterviewService, InterviewChatMessage } from '../../services/interview.service';
 import { TtsService } from '../../services/tts.service';
 import {
@@ -1628,6 +1628,31 @@ export class InvestigationView implements OnInit {
 
   readonly isLoading = signal(true);
   readonly casePackage = signal<CasePackage | null>(null);
+
+  /**
+   * Images are made as the player reaches them (see imagesReached): a clue's
+   * picture when it is found, a suspect's when they are unlocked, the next
+   * act's banner ahead of time. Cached ones resolve from IndexedDB, which is
+   * also how the blob URLs come back after a refresh. Each image is asked for
+   * once per visit to this view.
+   */
+  private readonly requestedImages = new Set<string>();
+  private readonly loadReachedImages = effect(() => {
+    const pkg = this.casePackage();
+    const reached = imagesReached(this.gsvc.state());
+    if (!pkg) return;
+    untracked(() =>
+      this.imageService
+        .caseImageUpdates(pkg, (entityType, entityId) => {
+          const key = `${entityType}:${entityId}`;
+          if (!reached(entityType, entityId) || this.requestedImages.has(key)) return false;
+          this.requestedImages.add(key);
+          return true;
+        })
+        .subscribe((apply) => this.casePackage.update((current) => current && apply(current))),
+    );
+  });
+
   readonly selectedEvent = signal<InvestigationEvent | null>(null);
   readonly activeInterviewSuspect = signal<Suspect | null>(null);
   readonly revisitInterviewTranscript = signal<InterviewChatMessage[] | null>(null);
@@ -1974,11 +1999,7 @@ export class InvestigationView implements OnInit {
           }, 400);
         }
       }
-
-      // Re-hydrate blob object URLs from the IndexedDB image cache (they don't survive page refresh)
-      this.imageService.generateAllCaseImages(repairedPkg).subscribe({
-        next: (updated) => this.casePackage.set(updated),
-      });
+      // Images (including re-hydrating cached blob URLs) load via loadReachedImages.
     });
   }
 

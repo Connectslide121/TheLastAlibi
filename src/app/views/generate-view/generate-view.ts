@@ -3,7 +3,7 @@ import { Router } from '@angular/router';
 import { DebugTraceService } from '../../services/debug-trace.service';
 import { LlmService } from '../../services/llm.service';
 import { isQuotaError } from '../../services/worker-llm';
-import { ImageService } from '../../services/image.service';
+import { ImageService, imagesReached } from '../../services/image.service';
 import { GameStateService } from '../../services/game-state.service';
 import { CaseStoreService } from '../../services/case-store.service';
 import { ThemeService } from '../../services/theme.service';
@@ -133,7 +133,9 @@ export class GenerateView implements OnInit {
             // Stay on loading phase — the template shows the Go to Case button
             // once readyPkg is set.
 
-            // Pre-generate TTS narrations in the background (fire-and-forget).
+            // Pre-generate the narrations that play straight away, in the
+            // background (fire-and-forget). Acts II and III are narrated when
+            // they open: playNarration makes them then if they are not cached.
             this.ttsService
               .preGenerateNarrations(pkg.id, [
                 { key: 'briefing', text: pkg.metadata.briefing },
@@ -141,14 +143,13 @@ export class GenerateView implements OnInit {
                   key: 'act1',
                   text: `Act I: The Investigation Begins. ${pkg.metadata.act1Summary}`,
                 },
-                { key: 'act2', text: `Act II: Deeper Lies. ${pkg.metadata.act2Summary}` },
-                { key: 'act3', text: `Act III: The Final Deduction. ${pkg.metadata.act3Summary}` },
               ])
               .subscribe();
 
-            // Continue loading images in the background so the briefing is usable immediately.
+            // Only the opening images (briefing, first act banners) are made
+            // now; the rest are made as the player reaches them.
             this.llm.markImageStepActive();
-            this.imageService.generateAllCaseImages(pkg).subscribe({
+            this.imageService.generateAllCaseImages(pkg, imagesReached(null)).subscribe({
               next: (updated) => {
                 this.readyPkg.set(updated);
                 this.caseStore.storeDebugTrace(pkg.id, this.debugTrace.snapshot()).subscribe();

@@ -4,6 +4,7 @@ import { catchError, finalize, map, mergeMap, shareReplay, switchMap } from 'rxj
 
 import { environment } from '../../environments/environment';
 import { CasePackage } from '../models';
+import type { GameState } from '../models/game-state.model';
 import { DebugTraceService } from './debug-trace.service';
 import { LlmService } from './llm.service';
 import { getCachedImage, setCachedImage, hashPrompt, CachedImage } from '../utils/image-cache';
@@ -32,6 +33,48 @@ const DIMENSIONS: Record<string, { width: number; height: number }> = {
   location: { width: 768, height: 512 },
   clue: { width: 512, height: 512 },
 };
+
+export type ImageEntityType = 'case' | 'suspect' | 'location' | 'clue';
+
+/** Decides which of a case's images are wanted right now. */
+export type ImageScope = (entityType: ImageEntityType, entityId: string) => boolean;
+
+export const ALL_IMAGES: ImageScope = () => true;
+
+/**
+ * The images a player has a reason to see yet, from their progress: the
+ * briefing, the banner for the current act and the next one (fetched ahead so
+ * it is ready when the act opens), and the suspects, locations and clues they
+ * have reached.
+ *
+ * Images are generated on Cloudflare's free Workers AI tier, where one image
+ * costs about as much as a tenth of a day's allowance. Generating all of a
+ * case's ~25 images up front cost more than two days of it, so they are made
+ * when they are first needed instead.
+ */
+export function imagesReached(state: GameState | null): ImageScope {
+  const act = state?.currentAct ?? 1;
+  const suspects = new Set([
+    ...(state?.unlockedSuspectIds ?? []),
+    ...(state?.interviewedSuspectIds ?? []),
+  ]);
+  const locations = new Set(state?.visitedLocationIds ?? []);
+  const clues = new Set(state?.foundClueIds ?? []);
+  return (entityType, entityId) => {
+    switch (entityType) {
+      case 'case': {
+        const actImage = entityId.match(/-act([123])ImageUrl$/);
+        return !actImage || Number(actImage[1]) <= act + 1;
+      }
+      case 'suspect':
+        return suspects.has(entityId);
+      case 'location':
+        return locations.has(entityId);
+      case 'clue':
+        return clues.has(entityId);
+    }
+  };
+}
 
 const SAFE_PROMPT_VERSION = 'safe-prompt-v1';
 const IMAGE_BATCH_CONCURRENCY = 3;
@@ -147,17 +190,45 @@ export class ImageService {
   }
 
   /**
-   * Generate all images for a CasePackage progressively.
+   * Generate a CasePackage's images progressively — those `scope` allows (all
+   * of them by default). Cached images resolve from IndexedDB without a call.
    * Emits an updated CasePackage snapshot after each image resolves.
    * Uses globalStylePrompt from visualDirection as a style prefix.
    */
-  generateAllCaseImages(casePackage: CasePackage): Observable<CasePackage> {
+  generateAllCaseImages(
+    casePackage: CasePackage,
+    scope: ImageScope = ALL_IMAGES,
+  ): Observable<CasePackage> {
+    return new Observable<CasePackage>((observer) => {
+      let current = casePackage;
+      const subscription = this.caseImageUpdates(casePackage, scope).subscribe({
+        next: (apply) => {
+          current = apply(current);
+          observer.next(current);
+        },
+        error: (error) => observer.error(error),
+        complete: () => observer.complete(),
+      });
+      return () => subscription.unsubscribe();
+    });
+  }
+
+  /**
+   * Like generateAllCaseImages, but emits each result as an update function
+   * rather than a snapshot, so a caller can apply it to its latest package.
+   * That keeps results from separate batches (one per clue found, say) from
+   * overwriting each other.
+   */
+  caseImageUpdates(
+    casePackage: CasePackage,
+    scope: ImageScope = ALL_IMAGES,
+  ): Observable<(pkg: CasePackage) => CasePackage> {
     const stylePrefix = casePackage.visualDirection?.globalStylePrompt ?? '';
     const prefix = stylePrefix ? stylePrefix + ', ' : '';
     const caseId = casePackage.id;
 
     type Task = {
-      entityType: string;
+      entityType: ImageEntityType;
       entityId: string;
       prompt: string;
       apply: (pkg: CasePackage, url: string) => CasePackage;
@@ -196,7 +267,7 @@ export class ImageService {
           },
         ] as const
       ).map(({ actKey, summary, label }) => ({
-        entityType: 'case',
+        entityType: 'case' as const,
         entityId: `${casePackage.id}-${actKey}`,
         prompt:
           prefix +
@@ -207,7 +278,7 @@ export class ImageService {
         }),
       })),
       ...casePackage.suspects.map((s) => ({
-        entityType: 'suspect',
+        entityType: 'suspect' as const,
         entityId: s.id,
         prompt: prefix + s.imagePrompt,
         apply: (pkg: CasePackage, url: string): CasePackage => ({
@@ -216,7 +287,7 @@ export class ImageService {
         }),
       })),
       ...casePackage.locations.map((l) => ({
-        entityType: 'location',
+        entityType: 'location' as const,
         entityId: l.id,
         prompt: prefix + l.imagePrompt,
         apply: (pkg: CasePackage, url: string): CasePackage => ({
@@ -225,7 +296,7 @@ export class ImageService {
         }),
       })),
       ...casePackage.clues.map((c) => ({
-        entityType: 'clue',
+        entityType: 'clue' as const,
         entityId: c.id,
         prompt: prefix + c.imagePrompt,
         apply: (pkg: CasePackage, url: string): CasePackage => ({
@@ -235,9 +306,8 @@ export class ImageService {
       })),
     ];
 
-    return new Observable<CasePackage>((observer) => {
-      let current = casePackage;
-      const subscription = from(tasks)
+    return new Observable<(pkg: CasePackage) => CasePackage>((observer) => {
+      const subscription = from(tasks.filter((t) => scope(t.entityType, t.entityId)))
         .pipe(
           mergeMap(
             (task) =>
@@ -249,10 +319,7 @@ export class ImageService {
           ),
         )
         .subscribe({
-          next: ({ task, url }) => {
-            current = task.apply(current, url);
-            observer.next(current);
-          },
+          next: ({ task, url }) => observer.next((pkg) => task.apply(pkg, url)),
           error: (error) => observer.error(error),
           complete: () => observer.complete(),
         });
