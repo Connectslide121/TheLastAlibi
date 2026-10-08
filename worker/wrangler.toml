@@ -8,3 +8,20 @@ compatibility_date = "2026-09-01"
 # Workers AI, as env.AI
 [ai]
 binding = "AI"
+
+# Provider chains, tried in order (see src/providers.js). An entry whose API key
+# is not set is skipped. Keys are secrets, never put here:
+#   npx wrangler secret put GEMINI_API_KEY   (also GROQ_API_KEY, CEREBRAS_API_KEY,
+#   POLLINATIONS_API_KEY, optionally OPENROUTER_API_KEY)
+[vars]
+# Case generation and puzzles. Strong models only: when they are all out, the
+# game says "come back tomorrow" rather than settle for a weaker model.
+TEXT_CASE_CHAIN = "gemini:gemini-3-flash-preview, groq:openai/gpt-oss-120b, cerebras:gpt-oss-120b"
+# Suspect interviews: fast, and on models the case chain does not use, so a
+# busy day of interviews cannot use up case generation's quota.
+TEXT_CHAT_CHAIN = "groq:openai/gpt-oss-20b, cerebras:qwen-3-32b, gemini:gemini-2.5-flash-lite, workers-ai:@cf/meta/llama-3.1-8b-instruct-fast"
+# Small jobs (rewriting image prompts).
+TEXT_UTILITY_CHAIN = "gemini:gemini-2.5-flash-lite, workers-ai:@cf/meta/llama-3.1-8b-instruct-fast"
+# Images: Pollinations only does images here, so they never draw on the text
+# providers. Workers AI is the reserve.
+IMAGE_CHAIN = "pollinations:black-forest-labs/flux.2-klein-4b, workers-ai:@cf/black-forest-labs/flux-2-klein-9b"
