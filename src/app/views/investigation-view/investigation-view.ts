@@ -1649,9 +1649,35 @@ export class InvestigationView implements OnInit {
           this.requestedImages.add(key);
           return true;
         })
-        .subscribe((apply) => this.casePackage.update((current) => current && apply(current))),
+        .subscribe((apply) => {
+          this.casePackage.update((current) => current && apply(current));
+          this.refreshHeldEntities();
+        }),
     );
   });
+
+  /**
+   * Dialogs hold their own copy of the clue, suspect or location they show,
+   * taken when they open. With images made on demand, that copy can predate
+   * its image (a clue's picture is asked for the moment the clue is found), so
+   * each copy is swapped for the package's latest version when an image lands.
+   */
+  private refreshHeldEntities(): void {
+    const pkg = this.casePackage();
+    if (!pkg) return;
+    const latest = <T extends { id: string }>(held: T | null, list: T[]): T | null =>
+      held ? (list.find((x) => x.id === held.id) ?? held) : held;
+    this.activeInterviewSuspect.update((s) => latest(s, pkg.suspects));
+    this.expandedSuspect.update((s) => latest(s, pkg.suspects));
+    this.expandedClue.update((c) => latest(c, pkg.clues));
+    this.expandedLocation.update((l) => latest(l, pkg.locations));
+    this.unlockSpotlight.update((spot) => {
+      if (spot?.kind === 'clue') return { kind: 'clue', clue: latest(spot.clue, pkg.clues)! };
+      if (spot?.kind === 'suspect')
+        return { kind: 'suspect', suspect: latest(spot.suspect, pkg.suspects)! };
+      return spot;
+    });
+  }
 
   readonly selectedEvent = signal<InvestigationEvent | null>(null);
   readonly activeInterviewSuspect = signal<Suspect | null>(null);
