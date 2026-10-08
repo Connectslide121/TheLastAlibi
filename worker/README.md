@@ -33,16 +33,8 @@ npx wrangler secret put POLLINATIONS_API_KEY
 # optional reserve: npx wrangler secret put OPENROUTER_API_KEY
 ```
 
-Optional, recommended: remember exhausted providers across Cloudflare's
-servers (otherwise each server learns it separately, with one wasted request):
-
-```sh
-npx wrangler kv namespace create QUOTA
-# then add to wrangler.toml:
-# [[kv_namespaces]]
-# binding = "QUOTA"
-# id = "<the id it printed>"
-```
+Exhausted providers are remembered across Cloudflare's servers in the `QUOTA`
+KV namespace (already set up in `wrangler.toml`).
 
 ## Day to day
 
