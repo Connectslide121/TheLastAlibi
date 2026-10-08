@@ -69,15 +69,27 @@ export default {
 };
 
 /**
- * When every provider in a chain is out of quota, answer the way Workers AI
- * does (error 4006): the game already recognises that and tells the player to
- * come back after midnight UTC.
+ * No provider could answer. When they are all out for the day, answer the way
+ * Workers AI does (error 4006): the game recognises that and tells the player
+ * to come back after midnight UTC. When they are only busy (a per-minute
+ * limit), say so with Retry-After: the game simply tries again.
  */
 function exhaustedResponse(result, corsHeaders) {
-  const error = result.quota
-    ? "4006: daily free allocation used up on every configured provider"
-    : "Every configured provider failed";
-  return jsonResponse({ error, attempts: result.attempts }, result.quota ? 429 : 502, corsHeaders);
+  if (result.quota) {
+    return jsonResponse(
+      { error: "4006: daily free allocation used up on every configured provider", attempts: result.attempts },
+      429,
+      corsHeaders,
+    );
+  }
+  if (result.retryAfter) {
+    return jsonResponse(
+      { error: `Every provider is busy; retry in ${result.retryAfter}s`, attempts: result.attempts },
+      503,
+      { ...corsHeaders, "Retry-After": String(result.retryAfter) },
+    );
+  }
+  return jsonResponse({ error: "Every configured provider failed", attempts: result.attempts }, 502, corsHeaders);
 }
 
 async function handleText(request, env, corsHeaders, route) {

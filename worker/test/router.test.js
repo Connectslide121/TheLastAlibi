@@ -122,7 +122,7 @@ test("reasoning models get room to think", async () => {
 });
 
 test("interviews use the chat chain and may fall back to a small model", async () => {
-  mockFetch({ "api.groq.com": [chat("busy", 429, { "retry-after": "20" })] });
+  mockFetch({ "api.groq.com": [chat("busy", 429, { "retry-after": "600" })] });
   const data = await (await worker.fetch(post("/text", { prompt: "p", task: "chat", json: true }), env())).json();
   assert.equal(data.raw.provider, "workers-ai");
 });
@@ -171,4 +171,26 @@ test("narration uses Workers AI, then Pollinations with the matching voice", asy
   const fallback = await worker.fetch(post("/tts", { text: "Act II.", speaker: "zeus" }), env({ ...speech, AI: out }));
   assert.equal(fallback.headers.get("X-AI-Provider"), "pollinations");
   assert.equal(calls[0].body.voice, "onyx");
+});
+
+test("a short per-minute limit is waited out and retried on the same model", async () => {
+  mockFetch({
+    "generativelanguage.googleapis.com": [
+      chat('{"error":{"message":"Rate limit reached on tokens per minute (TPM). Please try again in 0.3s."}}', 429),
+      chat('{"after":"wait"}'),
+    ],
+  });
+  const t0 = Date.now();
+  const data = await (await worker.fetch(post("/text", { prompt: "p", json: true }), env())).json();
+  assert.equal(data.raw.provider, "gemini");
+  assert.ok(Date.now() - t0 >= 300);
+});
+
+test("providers that are only busy are not reported as closed for the day", async () => {
+  const busy = chat("Please try again in 30s", 429);
+  mockFetch({ "generativelanguage.googleapis.com": [busy], "api.groq.com": [busy] });
+  const res = await worker.fetch(post("/text", { prompt: "p", json: true }), env());
+  assert.equal(res.status, 503);
+  assert.ok(Number(res.headers.get("Retry-After")) > 0);
+  assert.doesNotMatch((await res.json()).error, /4006/);
 });

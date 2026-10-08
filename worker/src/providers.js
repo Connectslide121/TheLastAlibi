@@ -55,23 +55,39 @@ function nextUtcMidnight(now = Date.now()) {
   return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + 1);
 }
 
-async function isExhausted(env, key) {
+/**
+ * Waits up to this long are sat out inside the request (a free tier's
+ * per-minute limit: Groq allows 8,000 tokens a minute, and building a case
+ * sends several large requests at once). Longer ones skip the provider.
+ */
+const SHORT_WAIT_MS = 20_000;
+/** At most this much waiting per request, across all its providers. */
+const WAIT_BUDGET_MS = 45_000;
+/** A provider out for longer than this counts as "out for the day". */
+const LONG_OUT_MS = 10 * 60_000;
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/** Until when a provider is out (epoch ms), or 0. */
+async function exhaustedUntilFor(env, key) {
   const local = exhaustedUntil.get(key);
-  if (local && local > Date.now()) return true;
+  if (local && local > Date.now()) return local;
   if (env.QUOTA) {
     const until = Number(await env.QUOTA.get(`exhausted:${key}`));
     if (until > Date.now()) {
       exhaustedUntil.set(key, until);
-      return true;
+      return until;
     }
   }
-  return false;
+  return 0;
 }
 
 async function markExhausted(env, key, until) {
   exhaustedUntil.set(key, until);
-  if (env.QUOTA) {
-    const ttl = Math.max(60, Math.ceil((until - Date.now()) / 1000));
+  // Only lasting windows are shared: KV keeps values for at least a minute and
+  // takes a while to reach other servers, too slow for a seconds-long wait.
+  if (env.QUOTA && until - Date.now() > 60_000) {
+    const ttl = Math.ceil((until - Date.now()) / 1000);
     await env.QUOTA.put(`exhausted:${key}`, String(until), { expirationTtl: ttl }).catch(() => {});
   }
 }
@@ -145,7 +161,9 @@ async function openAiChat(env, provider, model, req, { jsonMode = true, reasonin
     max_tokens: reasoning ? req.maxTokens + 4096 : req.maxTokens,
   };
   if (req.json && jsonMode) body.response_format = { type: "json_object" };
-  if (reasoning && reasoningHint) body.reasoning_effort = req.task === "case" ? "medium" : "low";
+  // Thinking tokens count against per-minute limits: Groq's free tier allows
+  // only 8,000 a minute, so only Gemini (250k a minute) thinks harder.
+  if (reasoning && reasoningHint) body.reasoning_effort = req.task === "case" && provider === "gemini" ? "medium" : "low";
 
   const res = await fetch(p.url, {
     method: "POST",
@@ -188,50 +206,86 @@ async function workersAiChat(env, model, req) {
 }
 
 /**
- * Run a text job down its chain. `req`: { messages, maxTokens, temperature,
- * json, task }. Returns { ok, text, provider, model, attempts } or, when every
- * entry failed, { ok: false, quota, attempts }.
+ * Run a job down its chain. `call(provider, model)` does one attempt and
+ * returns { ok, ... } or { ok: false, status, body, retryAfter }; `reject`
+ * may turn down a successful answer (empty, invalid JSON) so the next entry
+ * gets a go.
+ *
+ * Returns the winning result with { provider, model, attempts }, or
+ * { ok: false, quota, retryAfter, attempts }: `quota` is true only when every
+ * provider is out for a long time (the game then says "come back tomorrow");
+ * otherwise `retryAfter` says when trying again is worth it.
  */
-export async function runText(env, chain, req) {
+async function runChain(env, chain, call, reject = () => null) {
   const attempts = [];
+  const t0 = Date.now();
+  const budgetLeft = () => WAIT_BUDGET_MS - (Date.now() - t0);
   for (const { provider, model } of chain) {
     const key = `${provider}:${model}`;
     if (!hasCredentials(env, provider)) {
       attempts.push({ key, skipped: "no key" });
       continue;
     }
-    if (await isExhausted(env, key)) {
-      attempts.push({ key, skipped: "quota" });
-      continue;
+    for (let tries = 0; ; tries++) {
+      const until = await exhaustedUntilFor(env, key);
+      if (until) {
+        const wait = until - Date.now();
+        if (wait <= SHORT_WAIT_MS && wait <= budgetLeft() && tries < 3) {
+          await sleep(wait + 250);
+        } else {
+          attempts.push({ key, skipped: "quota", until });
+          break;
+        }
+      }
+      let result;
+      try {
+        result = await call(provider, model);
+      } catch (err) {
+        result = { ok: false, status: 0, body: err instanceof Error ? err.message : String(err) };
+      }
+      if (result.ok) {
+        const why = reject(result);
+        if (why) {
+          attempts.push({ key, error: why });
+          break;
+        }
+        attempts.push({ key, ok: true });
+        return { ...result, provider, model, attempts };
+      }
+      const out = quotaWindow(result.status, result.body, result.retryAfter);
+      if (out) {
+        await markExhausted(env, key, out);
+        // A short wait: go round again and sit it out, if the budget allows.
+        if (out - Date.now() <= SHORT_WAIT_MS && out - Date.now() <= budgetLeft() && tries < 2) continue;
+        attempts.push({ key, status: result.status, until: out, error: String(result.body).slice(0, 200) });
+      } else {
+        attempts.push({ key, status: result.status, error: String(result.body).slice(0, 200) });
+      }
+      break;
     }
-    let result;
-    try {
-      result =
-        provider === "workers-ai"
-          ? await workersAiChat(env, model, req)
-          : await openAiChat(env, provider, model, req);
-    } catch (err) {
-      result = { ok: false, status: 0, body: err instanceof Error ? err.message : String(err) };
-    }
-    if (!result.ok) {
-      const until = quotaWindow(result.status, result.body, result.retryAfter);
-      if (until) await markExhausted(env, key, until);
-      attempts.push({ key, status: result.status, error: String(result.body).slice(0, 200) });
-      continue;
-    }
-    if (!result.text.trim()) {
-      attempts.push({ key, error: "empty answer" });
-      continue;
-    }
-    if (req.json && !isValidJson(result.text)) {
-      attempts.push({ key, error: `invalid JSON${result.finish === "length" ? " (cut off)" : ""}` });
-      continue;
-    }
-    attempts.push({ key, ok: true });
-    return { ok: true, text: result.text, provider, model, usage: result.usage, attempts };
   }
-  const quota = attempts.length > 0 && attempts.every((a) => a.skipped === "quota" || a.skipped === "no key" || a.status === 429 || a.status === 402);
-  return { ok: false, quota, attempts };
+  const outs = attempts.filter((a) => a.until);
+  const now = Date.now();
+  const quota = outs.length > 0 && attempts.every((a) => a.skipped === "no key" || (a.until && a.until - now > LONG_OUT_MS));
+  const retryAfter = outs.length ? Math.max(1, Math.ceil((Math.min(...outs.map((a) => a.until)) - now) / 1000)) : undefined;
+  return { ok: false, quota, retryAfter, attempts };
+}
+
+/**
+ * Run a text job down its chain. `req`: { messages, maxTokens, temperature,
+ * json, task }.
+ */
+export function runText(env, chain, req) {
+  return runChain(
+    env,
+    chain,
+    (provider, model) => (provider === "workers-ai" ? workersAiChat(env, model, req) : openAiChat(env, provider, model, req)),
+    (result) => {
+      if (!result.text.trim()) return "empty answer";
+      if (req.json && !isValidJson(result.text)) return `invalid JSON${result.finish === "length" ? " (cut off)" : ""}`;
+      return null;
+    },
+  );
 }
 
 // --- images ------------------------------------------------------------------
@@ -266,43 +320,12 @@ async function workersAiImage(env, model, { prompt, width, height, seed }) {
   }
 }
 
-/** Run a media job (image, speech) down its chain; `call` does one entry. */
-async function runMedia(env, chain, req, call) {
-  const attempts = [];
-  for (const { provider, model } of chain) {
-    const key = `${provider}:${model}`;
-    if (!hasCredentials(env, provider)) {
-      attempts.push({ key, skipped: "no key" });
-      continue;
-    }
-    if (await isExhausted(env, key)) {
-      attempts.push({ key, skipped: "quota" });
-      continue;
-    }
-    let result;
-    try {
-      result = await call(provider, model, req);
-    } catch (err) {
-      result = { ok: false, status: 0, body: err instanceof Error ? err.message : String(err) };
-    }
-    if (result.ok) {
-      attempts.push({ key, ok: true });
-      return { ...result, provider, model, attempts };
-    }
-    const until = quotaWindow(result.status, result.body, result.retryAfter);
-    if (until) await markExhausted(env, key, until);
-    attempts.push({ key, status: result.status, error: String(result.body).slice(0, 200) });
-  }
-  const quota = attempts.length > 0 && attempts.every((a) => a.skipped || a.status === 429 || a.status === 402);
-  return { ok: false, quota, attempts };
-}
-
 export function runImage(env, chain, req) {
-  return runMedia(env, chain, req, (provider, model, r) =>
+  return runChain(env, chain, (provider, model) =>
     provider === "pollinations"
-      ? pollinationsImage(env, model, r)
+      ? pollinationsImage(env, model, req)
       : provider === "workers-ai"
-        ? workersAiImage(env, model, r)
+        ? workersAiImage(env, model, req)
         : { ok: false, status: 0, body: `unknown image provider ${provider}` },
   );
 }
@@ -335,11 +358,11 @@ async function pollinationsSpeech(env, model, { text, speaker }) {
 }
 
 export function runSpeech(env, chain, req) {
-  return runMedia(env, chain, req, (provider, model, r) =>
+  return runChain(env, chain, (provider, model) =>
     provider === "workers-ai"
-      ? workersAiSpeech(env, model, r)
+      ? workersAiSpeech(env, model, req)
       : provider === "pollinations"
-        ? pollinationsSpeech(env, model, r)
+        ? pollinationsSpeech(env, model, req)
         : { ok: false, status: 0, body: `unknown speech provider ${provider}` },
   );
 }
