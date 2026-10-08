@@ -4,11 +4,21 @@ import { Observable, from } from 'rxjs';
 import { environment } from '../../environments/environment';
 import { DebugRequestMeta, DebugTraceService } from './debug-trace.service';
 
+/**
+ * Which of the Worker's model chains a call uses: "case" (case building,
+ * strong models only), "chat" (suspect interviews, fast models) or "utility"
+ * (small rewrites). See worker/wrangler.toml.
+ */
+export type WorkerTask = 'case' | 'chat' | 'utility';
+
 export interface WorkerGenerationOptions {
   prompt: string;
   systemPrompt?: string;
   maxTokens?: number;
   temperature?: number;
+  task?: WorkerTask;
+  /** The answer must be JSON: the Worker asks for JSON mode and rejects answers that do not parse. */
+  json?: boolean;
   debugMeta?: DebugRequestMeta;
 }
 
@@ -70,6 +80,8 @@ export class WorkerLlmService {
       systemPrompt: options.systemPrompt,
       maxTokens: options.maxTokens ?? defaults.maxTokens,
       temperature: options.temperature ?? defaults.temperature,
+      task: options.task,
+      json: options.json,
     };
     const requestId = this.debug.beginAiRequest(path, payload, options.debugMeta);
 

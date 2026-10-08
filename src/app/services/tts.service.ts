@@ -73,6 +73,7 @@ export class TtsService {
       this.currentAudio.src = '';
       this.currentAudio = null;
     }
+    if (typeof window !== 'undefined') window.speechSynthesis?.cancel();
     this.isPlaying.set(false);
   }
 
@@ -124,7 +125,7 @@ export class TtsService {
       }
 
       if (!blob) {
-        this.isPlaying.set(false);
+        await this.speakWithBrowser(text);
         return;
       }
 
@@ -141,13 +142,39 @@ export class TtsService {
     try {
       const blob = await this.fetchAudioBlob(text, speaker);
       if (!blob) {
-        this.isPlaying.set(false);
+        await this.speakWithBrowser(text);
         return;
       }
       await this.playBlob(blob);
     } catch {
       this.isPlaying.set(false);
     }
+  }
+
+  /**
+   * The browser's built-in voice, used when the Worker cannot narrate (its
+   * speech model shares the daily AI quota). Free and unlimited; it sounds
+   * less natural, so it is only the fallback. Resolves when speech ends.
+   */
+  private speakWithBrowser(text: string): Promise<void> {
+    const synth = typeof window !== 'undefined' ? window.speechSynthesis : undefined;
+    if (!synth || typeof SpeechSynthesisUtterance === 'undefined') {
+      this.isPlaying.set(false);
+      return Promise.resolve();
+    }
+    return new Promise<void>((resolve) => {
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'en-US';
+      utterance.rate = 0.95;
+      const done = () => {
+        this.isPlaying.set(false);
+        resolve();
+      };
+      utterance.onend = done;
+      utterance.onerror = done;
+      synth.cancel();
+      synth.speak(utterance);
+    });
   }
 
   private async fetchAudioBlob(text: string, speaker: TtsSpeaker): Promise<Blob | null> {

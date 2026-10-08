@@ -127,6 +127,9 @@ export interface LlmCallOptions {
   systemPrompt?: string;
   maxTokens?: number;
   temperature?: number;
+  /** The Worker's model chain; case building is the default. */
+  task?: 'case' | 'chat' | 'utility';
+  json?: boolean;
   debugMeta?: DebugRequestMeta;
 }
 

@@ -133,6 +133,8 @@ export class InterviewService {
           prompt,
           maxTokens: 600,
           temperature: 0.85,
+          task: 'chat',
+          json: true,
         })
         .subscribe({
           next: (raw) => {

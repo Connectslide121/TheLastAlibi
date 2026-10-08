@@ -564,7 +564,7 @@ export class LlmService {
     options: LlmCallOptions = {},
     jsonAttempt = 0,
   ): Observable<T> {
-    return this.callText(prompt, options).pipe(
+    return this.callText(prompt, { ...options, json: true }).pipe(
       map((raw) => this.parseJson<T>(raw)),
       catchError((err: Error) => {
         if (err.message.startsWith('LLM response is not valid JSON') && jsonAttempt < 2) {
@@ -584,6 +584,7 @@ export class LlmService {
     },
   ): Observable<string> {
     return this.callText(buildSafeImagePrompt(originalPrompt), {
+      task: 'utility',
       maxTokens: 500,
       temperature: 0.1,
       debugMeta,
